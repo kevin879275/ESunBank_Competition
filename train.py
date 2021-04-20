@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torchsummary import summary
 from torch.utils.data import Dataset, DataLoader
-from model import Model
+from model import Model, SmoothCrossEntropyLoss
 import torchvision.transforms as transforms
 from DataLoader import ChineseHandWriteDataset
 import time
@@ -14,9 +14,10 @@ path = './data'
 label_file = 'training data dic.txt'
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(device)
 
 Epoch = 1
-BATCH_SIZE = 1
+BATCH_SIZE = 64
 lr = 0.01
 
 transform = transforms.Compose([
@@ -37,13 +38,12 @@ def main():
     dataset = ChineseHandWriteDataset(root=path, transform=transform)
     train_dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-    model = Model()
-    loss = nn.CrossEntropyLoss()
+    model = Model(in_features=16384).to(device)
+    loss = SmoothCrossEntropyLoss()
 
-    optimizer = nn.optim.Adam(model.parameters(), lr=lr)
+    optimizer = optim.Adam(model.parameters(), lr=lr)
 
     print("------------------ training start -----------------")
-
     for epoch in range(Epoch):
         since = time.time()
         loss_val_list = []
@@ -53,7 +53,7 @@ def main():
             label = label.to(device)
             optimizer.zero_grad()
             out = model(imgs)
-            loss_val = loss(out, imgs)
+            loss_val = loss(out, label)
             total_loss += loss_val
             loss_val.backward()
             optimizer.step()
