@@ -16,8 +16,8 @@ label_file = 'training data dic.txt'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
-Epoch = 1
-BATCH_SIZE = 64
+Epoch = 100
+BATCH_SIZE = 128
 lr = 0.01
 
 transform = transforms.Compose([
@@ -39,26 +39,34 @@ def main():
     train_dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
     model = Model(in_features=16384).to(device)
-    loss = SmoothCrossEntropyLoss()
+    loss = SmoothCrossEntropyLoss().to(device)
 
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    optimizer = optim.AdamW(model.parameters(), lr=lr)
 
     print("------------------ training start -----------------")
+
+    total_loss = []
+    total_correct = []
+
     for epoch in range(Epoch):
         since = time.time()
-        loss_val_list = []
-        total_loss = 0
+        running_loss = 0
+        running_correct = 0
         for imgs, label in train_dataloader:
             imgs = imgs.to(device)
             label = label.to(device)
             optimizer.zero_grad()
             out = model(imgs)
             loss_val = loss(out, label)
-            total_loss += loss_val
+            _, pred_class = torch.max(out.data, 1)
+            running_correct += torch.sum(pred_class == label)
+            running_loss += loss_val
             loss_val.backward()
             optimizer.step()
-        loss_val_list.append(total_loss.item() / len(train_dataloader))
-        print("Epoch = ", epoch + 1, " loss = ", loss_val_list[-1])
+        total_loss.append(running_loss.item() / 68804)
+        total_correct.append(running_correct.item() / 68804)
+        print("Epoch:{} Loss:{:.4f},  Correct:{:.4f}".format(
+            epoch+1, total_loss[-1], total_correct[-1]))
         now_time = time.time() - since
         print("Training time is:{:.0f}m {:.0f}s".format(
             now_time // 60, now_time % 60))

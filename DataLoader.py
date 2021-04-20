@@ -28,4 +28,4 @@ class ChineseHandWriteDataset(Dataset):
         return self.transform(self.data[index]), self.label[index]
 
     def __len__(self):
-        return 68803
+        return 68804
