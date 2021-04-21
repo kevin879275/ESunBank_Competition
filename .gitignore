@@ -135,7 +135,7 @@ dmypy.json
 *.npy
 
 # text file
-*.txt
+training data dic.txt
 
 #configuration file
 *.json
