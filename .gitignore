@@ -133,3 +133,9 @@ dmypy.json
 
 # numpy file
 *.npy
+
+# text file
+*.txt
+
+#configuration file
+*.json
