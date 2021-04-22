@@ -19,6 +19,16 @@ class ResNet18(nn.Module):
         y = self.model(x)
         return y
 
+class MobileNetv2(nn.Module):
+    def __init__(self, in_features, num_classes):
+        super(MobileNetv2, self).__init__()
+        self.model = torchvision.models.MobileNetV2(num_classes=num_classes)
+        num_filters = self.model.features[0][0].out_channels
+        self.model.features[0][0] = nn.Conv2d(in_channels=in_features, out_channels=num_filters, kernel_size=(3, 3), stride=(2, 2),
+                                     padding=(1, 1), bias=False)
+    def forward(self, x):
+        y = self.model(x)
+        return y
 
 class Model(nn.Module):
     def __init__(self, in_features):
