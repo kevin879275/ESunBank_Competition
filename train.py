@@ -27,7 +27,7 @@ args = parser.parse_args()
 # file path
 image_path = './train_image'
 path = './data'
-label_file = 'training data dic.txt'
+label_path = 'training data dic.txt'
 
 # Environment
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -44,20 +44,29 @@ split_rate = args.split_rate
 # def get_image_size():
 #     return len(os.listdir(image_path))
 
+def load_label_dic(label_path):
+    label_dic = {}
+    f = open(label_path, 'r', encoding="utf-8")
+    for idx, line in enumerate(f.readlines()):
+        label_dic[line[0]] = idx
+    return label_dic
+
 
 def main():
+    label_dic = load_label_dic(label_path)
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
-    dataset = ChineseHandWriteDataset(root=path, transform=transform)
+    dataset = ChineseHandWriteDataset(root=image_path, label_dic=label_dic, transform=transform, resize=True,
+                                      resize_size=128)
 
     train_set_size = int(len(dataset)*split_rate)
-    valid_set_size = len(dataset) - int(len(dataset)*split_rate)
+    valid_set_size = len(dataset) - train_set_size
     train_dataset, valid_dataset = data.random_split(
         dataset, [train_set_size, valid_set_size])
 
     train_dataloader = DataLoader(
-        train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+        train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=False, num_workers=8)
 
     valid_dataloader = DataLoader(valid_dataset, batch_size=valid_set_size)
 
