@@ -6,19 +6,18 @@ import torchvision
 
 
 class ResNet18(nn.Module):
-    def __init__(self, in_features, num_class, pretrained=False):
+    def __init__(self, in_features, num_classes, pretrained=False):
         super(ResNet18, self).__init__()
         self.model = torchvision.models.resnet18(pretrained=pretrained)
         num_filters = self.model.conv1.out_channels
         self.model.conv1 = nn.Conv2d(in_channels=in_features, out_channels=num_filters, kernel_size=(7, 7), stride=(2, 2),
                                 padding=(3, 3), bias=False)
         num_filters = self.model.fc.in_features
-        self.model.fc = nn.Linear(num_filters, out_features=num_class)
+        self.model.fc = nn.Linear(num_filters, out_features=num_classes)
 
     def forward(self, x):
         y = self.model(x)
         return y
-
 
 
 class SmoothCrossEntropyLoss(_WeightedLoss):

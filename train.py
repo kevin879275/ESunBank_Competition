@@ -6,7 +6,8 @@ import torch.optim as optim
 import torchvision.models
 from torchsummary import summary
 from torch.utils.data import Dataset, DataLoader
-from model import ResNet18, SmoothCrossEntropyLoss
+from model import *
+from RegNet import *
 import torchvision.transforms as transforms
 from DataLoader import ChineseHandWriteDataset
 import time
@@ -76,9 +77,12 @@ def main():
     valid_dataloader = DataLoader(valid_dataset, batch_size=valid_set_size)
 
     in_features = dataset[0][0].shape[0]
-    print(in_features)
-    model = ResNet18(in_features=in_features, num_class=num_classes, pretrained=False)
+    # for resnet
+    # model = ResNet18(in_features=in_features, num_classes=num_classes, pretrained=False)
+    # for regnet
+    model = regnety_002(num_classes=num_classes)
     model.to(device)
+
     loss = SmoothCrossEntropyLoss().to(device)
 
     optimizer = optim.AdamW(model.parameters(), lr=lr)
