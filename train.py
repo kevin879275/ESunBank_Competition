@@ -24,6 +24,7 @@ parser.add_argument("-l", "--learning_rate", type=float, default=0.01)
 parser.add_argument("-s", "--split_rate", type=float, default=0.8)
 parser.add_argument("-r", "--resize", type=int, default=True)
 parser.add_argument("-rs", "--resize_size", type=int, default=128)
+parser.add_argument("-vb", "--validbatchsize", type=int, default=1)
 # parser.add_argument("-g", "--gpu", type=int, default=0)
 args = parser.parse_args()
 
@@ -34,7 +35,7 @@ label_path = 'training data dic.txt'
 
 # Environment
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(device)
+# print(device)
 
 # Hyper Parameters
 Epoch = args.epochs
@@ -44,10 +45,7 @@ split_rate = args.split_rate
 resize = args.resize
 resize_size = args.resize_size
 num_classes = 801
-
-# get number of image
-# def get_image_size():
-#     return len(os.listdir(image_path))
+valid_batch_size = args.validbatchsize
 
 
 def load_label_dic(label_path):
@@ -74,7 +72,8 @@ def main():
     train_dataloader = DataLoader(
         train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=False, num_workers=1)
 
-    valid_dataloader = DataLoader(valid_dataset, batch_size=valid_set_size)
+    valid_dataloader = DataLoader(
+        valid_dataset, batch_size=valid_batch_size, pin_memory=False, num_workers=1)
 
     in_features = dataset[0][0].shape[0]
     # for resnet
@@ -83,6 +82,9 @@ def main():
     model = regnety_002(num_classes=num_classes)
     model.to(device)
 
+    # in_features = dataset[0][0].shape[1]*dataset[0][0].shape[2]
+    # model = Model(in_features=in_features).to(device)
+    # summary(model, (1, resize_size, resize_size))
     loss = SmoothCrossEntropyLoss().to(device)
 
     optimizer = optim.AdamW(model.parameters(), lr=lr)
@@ -98,6 +100,7 @@ def main():
         running_training_correct = 0
         running_valid_loss = 0
         running_valid_correct = 0
+        model.train()
         for imgs, label in train_dataloader:
             imgs = imgs.to(device)
             label = label.to(device)
@@ -109,14 +112,16 @@ def main():
             running_training_loss += loss_val
             loss_val.backward()
             optimizer.step()
-        for imgs, label in valid_dataloader:
-            imgs = imgs.to(device)
-            label = label.to(device)
-            out = model(imgs)
-            loss_val = loss(out, label)
-            _, pred_class = torch.max(out.data, 1)
-            running_valid_correct += torch.sum(pred_class == label)
-            running_valid_loss += loss_val
+        with torch.no_grad():
+            model.eval()
+            for imgs, label in valid_dataloader:
+                imgs = imgs.to(device)
+                label = label.to(device)
+                out = model(imgs)
+                loss_val = loss(out, label)
+                _, pred_class = torch.max(out.data, 1)
+                running_valid_correct += torch.sum(pred_class == label)
+                running_valid_loss += loss_val
         total_training_loss.append(
             running_training_loss.item() / train_set_size)
         total_training_correct.append(running_training_correct.item() /
