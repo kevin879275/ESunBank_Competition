@@ -17,6 +17,7 @@ class ResNet18(nn.Module):
 
     def forward(self, x):
         y = self.model(x)
+        return y
 
 
 class Model(nn.Module):

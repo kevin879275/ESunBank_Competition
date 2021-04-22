@@ -14,6 +14,11 @@ import time
 import matplotlib.pyplot as plt
 import argparse
 import torch.utils.data as data
+try:
+    from tqdm import tqdm
+except ImportError:
+    print('tqdm could not be imported. If you want to use progress bar during training,'
+          'install tqdm from https://github.com/tqdm/tqdm.')
 
 parser = argparse.ArgumentParser(
     description="ESun Competition HandWrite Recognition")
@@ -95,13 +100,14 @@ def main():
     total_valid_loss = []
     total_valid_correct = []
     for epoch in range(Epoch):
+        train_bar = tqdm(train_dataloader)
         since = time.time()
         running_training_loss = 0
         running_training_correct = 0
         running_valid_loss = 0
         running_valid_correct = 0
         model.train()
-        for imgs, label in train_dataloader:
+        for imgs, label in train_bar:
             imgs = imgs.to(device)
             label = label.to(device)
             optimizer.zero_grad()
@@ -135,6 +141,14 @@ def main():
         now_time = time.time() - since
         print("Training time is:{:.0f}m {:.0f}s".format(
             now_time // 60, now_time % 60))
+        train_bar.set_description(desc='[%d/%d] | Train Loss:%.4f | Train Accuracy:%.4f | Validation Loss:%.4f '
+                                       '| Validation Accuracy:%.4f | Training time:%.0f' %
+                                       (epoch+1, Epoch, total_training_loss[-1], total_training_correct[-1],
+                                        total_valid_loss[-1],
+                                        total_valid_correct[-1], now_time))
+        # train_bar.set_description(desc='[%d/%d] | Loss:%.4f | Accuracy:%.4f | Save Model:%r | ' %
+        #                                (epoch, EPOCH, running_results['loss'] / running_results['batch_sizes'],
+        #                                 accuracy, save_flag))
 
     plt.plot(range(1, Epoch + 1), total_training_loss)
     plt.title("loss value")
