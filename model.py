@@ -2,34 +2,23 @@ import torch
 import torch.nn as nn
 from torch.nn.modules.loss import _WeightedLoss
 import torch.nn.functional as F
+import torchvision
 
 
-class Model(nn.Module):
-    def __init__(self, in_features):
-        super(Model, self).__init__()
-        self.conv1 = nn.Conv2d(1, 1, 3, padding=1)
-        self.conv2 = nn.Conv2d(1, 1, 3, padding=1)
-        self.maxpooling = nn.MaxPool2d(2)
-        # self.dense1 = nn.Linear(in_features, 2048)
-        # self.dense2 = nn.Linear(2048, 1024)
-        self.dense3 = nn.Linear(1024, 801)
-        self.softmax = nn.Softmax()
-        self.ReLU = nn.ReLU()
+class ResNet18(nn.Module):
+    def __init__(self, in_features, num_class, pretrained=False):
+        super(ResNet18, self).__init__()
+        self.model = torchvision.models.resnet18(pretrained=pretrained)
+        num_filters = self.model.conv1.out_channels
+        self.model.conv1 = nn.Conv2d(in_channels=in_features, out_channels=num_filters, kernel_size=(7, 7), stride=(2, 2),
+                                padding=(3, 3), bias=False)
+        num_filters = self.model.fc.in_features
+        self.model.fc = nn.Linear(num_filters, out_features=num_class)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.maxpooling(x)
-        x = self.conv2(x)
-        x = self.maxpooling(x)
-        x = torch.flatten(x, start_dim=1)
-        # x = self.dense1(x)
-        # x = self.ReLU(x)
-        # x = self.dense2(x)
-        # x = self.ReLU(x)
-        x = self.dense3(x)
-        y = self.ReLU(x)
-        # y = self.softmax(x)
+        y = self.model(x)
         return y
+
 
 
 class SmoothCrossEntropyLoss(_WeightedLoss):
@@ -61,3 +50,4 @@ class SmoothCrossEntropyLoss(_WeightedLoss):
             log_preds = log_preds * self.weight.unsqueeze(0)
 
         return self.reduce_loss(-(targets * log_preds).sum(dim=-1))
+

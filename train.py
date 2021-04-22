@@ -3,9 +3,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torchvision.models
 from torchsummary import summary
 from torch.utils.data import Dataset, DataLoader
-from model import Model, SmoothCrossEntropyLoss
+from model import ResNet18, SmoothCrossEntropyLoss
 import torchvision.transforms as transforms
 from DataLoader import ChineseHandWriteDataset
 import time
@@ -41,6 +42,7 @@ lr = args.learning_rate
 split_rate = args.split_rate
 resize = args.resize
 resize_size = args.resize_size
+num_classes = 801
 
 # get number of image
 # def get_image_size():
@@ -69,12 +71,14 @@ def main():
         dataset, [train_set_size, valid_set_size])
 
     train_dataloader = DataLoader(
-        train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=False, num_workers=8)
+        train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=False, num_workers=1)
 
     valid_dataloader = DataLoader(valid_dataset, batch_size=valid_set_size)
 
-    in_features = dataset[0][0].shape[1]*dataset[0][0].shape[2]
-    model = Model(in_features=in_features).to(device)
+    in_features = dataset[0][0].shape[0]
+    print(in_features)
+    model = ResNet18(in_features=in_features, num_class=num_classes, pretrained=False)
+    model.to(device)
     loss = SmoothCrossEntropyLoss().to(device)
 
     optimizer = optim.AdamW(model.parameters(), lr=lr)
