@@ -20,7 +20,8 @@ parser.add_argument("-se", "--start_epoch", type=int, default=0)
 parser.add_argument("-b", "--batchsize", type=int, default=128)
 parser.add_argument("-l", "--learning_rate", type=float, default=0.01)
 parser.add_argument("-s", "--split_rate", type=float, default=0.8)
-
+parser.add_argument("-r", "--resize", type=int, default=True)
+parser.add_argument("-rs", "--resize_size", type=int, default=128)
 # parser.add_argument("-g", "--gpu", type=int, default=0)
 args = parser.parse_args()
 
@@ -38,11 +39,13 @@ Epoch = args.epochs
 BATCH_SIZE = args.batchsize
 lr = args.learning_rate
 split_rate = args.split_rate
-
+resize = args.resize
+resize_size = args.resize_size
 
 # get number of image
 # def get_image_size():
 #     return len(os.listdir(image_path))
+
 
 def load_label_dic(label_path):
     label_dic = {}
@@ -57,8 +60,8 @@ def main():
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
-    dataset = ChineseHandWriteDataset(root=image_path, label_dic=label_dic, transform=transform, resize=True,
-                                      resize_size=128)
+    dataset = ChineseHandWriteDataset(root=image_path, label_dic=label_dic, transform=transform, resize=resize,
+                                      resize_size=resize_size)
 
     train_set_size = int(len(dataset)*split_rate)
     valid_set_size = len(dataset) - train_set_size
