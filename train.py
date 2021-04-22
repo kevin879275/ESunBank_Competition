@@ -15,6 +15,10 @@ import matplotlib.pyplot as plt
 import argparse
 import torch.utils.data as data
 import json
+
+## Efficient Net V1 
+from efficientnet_pytorch import EfficientNet
+
 try:
     from tqdm import tqdm
 except ImportError:
@@ -93,6 +97,12 @@ def main():
     # for resnet
     # model = ResNet18(in_features=in_features, num_classes=num_classes, pretrained=False)
     # for regnet
+
+
+    ## Efficient Net V1 B0
+    model = EfficientNet.from_pretrained("efficientnet-b0",in_channels=1,num_classes=801)
+    model.cuda()
+
     model = regnety_002(num_classes=num_classes)
     model.to(device)
 
