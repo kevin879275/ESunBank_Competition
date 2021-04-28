@@ -1,4 +1,5 @@
 import os
+import re
 import numpy as np
 import torch
 import torch.nn as nn
@@ -15,7 +16,7 @@ import matplotlib.pyplot as plt
 import argparse
 import torch.utils.data as data
 import json
-
+import re
 ## Efficient Net V1 
 from efficientnet_pytorch import EfficientNet
 
@@ -38,6 +39,8 @@ parser.add_argument("-vb", "--validbatchsize", type=int, default=64)
 parser.add_argument("-g", "--gpu", type=int, default=0)
 args = parser.parse_args()
 
+
+
 # file path
 image_path = './train_image'
 path = './data'
@@ -57,7 +60,25 @@ resize = args.resize
 resize_size = args.resize_size
 num_classes = 801
 valid_batch_size = args.validbatchsize
+ 
 
+def getModelPath():
+    start_epoch=args.start_epoch
+    CHECKPOINT_FOLDER= './checkpoints/' + METHOD + '/'
+    files = [x for x in filter(lambda x:re.match(f'.*EPOCH_\d+.pkl',x),os.listdir(CHECKPOINT_FOLDER))]
+    if start_epoch==-1:
+        start_epoch=len(files)-1
+    if start_epoch>len(files)-1:
+        print(f"input start epoch {start_epoch} no exist model")
+        return ""
+    if start_epoch==-1:
+        start_epoch=0
+    for file in files:
+        r=re.match(r'EPOCH_(\d+).pkl',file)
+        num=int(r.groups(1)[0])
+        if num == start_epoch:
+            return f"{CHECKPOINT_FOLDER}EPOCH_{num}.pkl"
+    return ""
 
 def load_label_dic(label_path):
     label_dic = {}
@@ -74,7 +95,16 @@ def main():
         os.mkdir('checkpoints')
     if not os.path.exists(str('./checkpoints/' + METHOD)):
         os.mkdir('./checkpoints/' + METHOD)
+    modelPath =getModelPath()
+        ## Efficient Net V1 B0
 
+    
+    if modelPath != "":
+        model=torch.load(modelPath)
+    else:
+        model = EfficientNet.from_pretrained("efficientnet-b0",in_channels=1,num_classes=801)
+        model = regnety_002(num_classes=num_classes)
+    model.to(device)
     label_dic = load_label_dic(label_path)
     transform = transforms.Compose([
         transforms.ToTensor(),
@@ -99,12 +129,6 @@ def main():
     # for regnet
 
 
-    ## Efficient Net V1 B0
-    model = EfficientNet.from_pretrained("efficientnet-b0",in_channels=1,num_classes=801)
-    model.cuda()
-
-    model = regnety_002(num_classes=num_classes)
-    model.to(device)
 
     # in_features = dataset[0][0].shape[1]*dataset[0][0].shape[2]
     # model = Model(in_features=in_features).to(device)
