@@ -7,7 +7,6 @@ import torchvision.models
 from torchsummary import summary
 from torch.utils.data import Dataset, DataLoader
 from model import *
-from RegNet import *
 import torchvision.transforms as transforms
 from DataLoader import ChineseHandWriteDataset
 import time
@@ -101,7 +100,7 @@ def main():
 
     # Efficient Net V1 B0
     # model = EfficientNet.from_pretrained("efficientnet-b0",in_channels=1,num_classes=801)
-    
+
     model.cuda()
     # in_features = dataset[0][0].shape[1]*dataset[0][0].shape[2]
     # model = Model(in_features=in_features).to(device)
