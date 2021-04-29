@@ -29,7 +29,7 @@ except ImportError:
 parser = argparse.ArgumentParser(
     description="ESun Competition HandWrite Recognition")
 parser.add_argument("-e", "--epochs", type=int, default=100)
-parser.add_argument("-se", "--start_epoch", type=int, default=0)
+
 parser.add_argument("-b", "--batchsize", type=int, default=128)
 parser.add_argument("-l", "--learning_rate", type=float, default=0.01)
 parser.add_argument("-s", "--split_rate", type=float, default=0.8)
@@ -37,6 +37,16 @@ parser.add_argument("-r", "--resize", type=int, default=True)
 parser.add_argument("-rs", "--resize_size", type=int, default=128)
 parser.add_argument("-vb", "--validbatchsize", type=int, default=64)
 parser.add_argument("-g", "--gpu", type=int, default=0)
+
+### Checkpoint Path / Select Method ###
+parser.add_argument("-m","--method",type=str,default="efficientnet") #Method save name and load name
+parser.add_argument("-ml","--method_level",type=str,default="-b7") #Method level e.g. b0, b1, b2, b3 or S, M, L
+# final save name => method + method_level , e.g. efficientNetb0
+
+### Load Model Settings ### 
+parser.add_argument("-se", "--start_epoch", type=int, default=-1) #Load from epoch, -1 = final epoch in checkpoint
+parser.add_argument("-L","--load_model",type=bool,default=True) #Load model or train from 0
+
 args = parser.parse_args()
 
 
@@ -51,7 +61,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # print(device)
 
 # Hyper Parameters
-METHOD = "REGNET"
+METHOD = args.method + args.method_level
 Epoch = args.epochs
 BATCH_SIZE = args.batchsize
 lr = args.learning_rate
@@ -86,7 +96,14 @@ def load_label_dic(label_path):
     for idx, line in enumerate(f.readlines()):
         label_dic[line[0]] = idx
     return label_dic
-
+def switchModel():
+    if args.method == "efficientnet":
+        model = EfficientNet.from_pretrained(METHOD,in_channels=1,num_classes=num_classes)
+    elif METHOD == "regnet":
+        model = regnety_002(num_classes=num_classes)
+        # 
+        # model = globals()[METHOD](num_classes=num_classes)
+    return model
 
 def main():
     print("init data folder")
@@ -95,15 +112,18 @@ def main():
         os.mkdir('checkpoints')
     if not os.path.exists(str('./checkpoints/' + METHOD)):
         os.mkdir('./checkpoints/' + METHOD)
-    modelPath =getModelPath()
-        ## Efficient Net V1 B0
-
     
-    if modelPath != "":
-        model=torch.load(modelPath)
-    else:
-        model = EfficientNet.from_pretrained("efficientnet-b0",in_channels=1,num_classes=801)
-        model = regnety_002(num_classes=num_classes)
+
+    model = switchModel()
+    if args.load_model:
+        modelPath =getModelPath()
+        if modelPath != "":
+            model.load_state_dict(torch.load(modelPath))
+        else:
+            print("<load model error>Check whether your method and method_level setting is right. Or set load_model as False without try to load checkpoint model.")
+            exit(-1)
+    
+        
     model.to(device)
     label_dic = load_label_dic(label_path)
     transform = transforms.Compose([
