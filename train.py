@@ -100,9 +100,9 @@ def main():
     model = RegNetx(in_features, num_classes, model='regnety_320', pretrained=True)
 
     # Efficient Net V1 B0
-    model = EfficientNet.from_pretrained("efficientnet-b0",in_channels=1,num_classes=801)
+    # model = EfficientNet.from_pretrained("efficientnet-b0",in_channels=1,num_classes=801)
+    
     model.cuda()
-
     # in_features = dataset[0][0].shape[1]*dataset[0][0].shape[2]
     # model = Model(in_features=in_features).to(device)
     # summary(model, (1, resize_size, resize_size))
