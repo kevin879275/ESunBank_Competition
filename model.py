@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn.modules.loss import _WeightedLoss
 import torch.nn.functional as F
 import torchvision
-
+import timm
 
 class ResNet18(nn.Module):
     def __init__(self, in_features, num_classes, pretrained=False):
@@ -19,6 +19,7 @@ class ResNet18(nn.Module):
         y = self.model(x)
         return y
 
+
 class MobileNetv2(nn.Module):
     def __init__(self, in_features, num_classes):
         super(MobileNetv2, self).__init__()
@@ -30,6 +31,29 @@ class MobileNetv2(nn.Module):
     def forward(self, x):
         y = self.model(x)
         return y
+
+
+class RegNetx(nn.Module):
+    def __init__(self, in_features, num_classes, model='regnetx_002', pretrained=True):
+        """
+        RegNet Models
+        'regnetx_002', 'regnetx_004', 'regnetx_006', 'regnetx_008', 'regnetx_016', 'regnetx_032',
+        'regnetx_040', 'regnetx_064', 'regnetx_080', 'regnetx_120', 'regnetx_160', 'regnetx_320',
+        'regnety_002', 'regnety_004', 'regnety_006', 'regnety_008', 'regnety_016', 'regnety_032',
+        'regnety_040', 'regnety_064', 'regnety_080', 'regnety_120', 'regnety_160', 'regnety_320'
+        """
+        super(RegNetx, self).__init__()
+        self.model = timm.create_model(model, pretrained=pretrained)
+        num_filters = self.model.stem.conv.out_channels
+        self.model.stem.conv = nn.Conv2d(in_channels=in_features, out_channels=num_filters, kernel_size=(3, 3), stride=(2, 2),
+                                     padding=(1, 1), bias=False)
+        num_filters = self.model.head.fc.in_features
+        self.model.head.fc = nn.Linear(in_features=num_filters, out_features=num_classes, bias=True)
+
+    def forward(self, x):
+        y = self.model(x)
+        return y
+
 
 class Model(nn.Module):
     def __init__(self, in_features):
