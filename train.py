@@ -1,4 +1,5 @@
 import os
+import re
 import numpy as np
 import torch
 import torch.nn as nn
@@ -15,7 +16,7 @@ import argparse
 import torch.utils.data as data
 import json
 
-## Efficient Net V1
+# Efficient Net V1
 # from efficientnet_pytorch import EfficientNet
 
 try:
@@ -27,7 +28,6 @@ except ImportError:
 parser = argparse.ArgumentParser(
     description="ESun Competition HandWrite Recognition")
 parser.add_argument("-e", "--epochs", type=int, default=100)
-parser.add_argument("-se", "--start_epoch", type=int, default=0)
 parser.add_argument("-b", "--batchsize", type=int, default=128)
 parser.add_argument("-l", "--learning_rate", type=float, default=0.01)
 parser.add_argument("-s", "--split_rate", type=float, default=0.8)
@@ -35,6 +35,21 @@ parser.add_argument("-r", "--resize", type=int, default=True)
 parser.add_argument("-rs", "--resize_size", type=int, default=128)
 parser.add_argument("-vb", "--validbatchsize", type=int, default=64)
 parser.add_argument("-g", "--gpu", type=int, default=0)
+parser.add_argument("-nw", "--num_workers", type=int, default=2)
+
+### Checkpoint Path / Select Method ###
+# Method save name and load name
+parser.add_argument("-m", "--method", type=str, default="efficientnet")
+# Method level e.g. b0, b1, b2, b3 or S, M, L
+parser.add_argument("-ml", "--method_level", type=str, default="b0")
+# final save name => method + method_level , e.g. efficientNetb0
+
+### Load Model Settings ###
+# Load from epoch, -1 = final epoch in checkpoint
+parser.add_argument("-se", "--start_epoch", type=int, default=-1)
+parser.add_argument("-L", "--load_model", type=bool,
+                    default=True)  # Load model or train from 0
+
 args = parser.parse_args()
 
 # file path
@@ -47,7 +62,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # print(device)
 
 # Hyper Parameters
-METHOD = "REGNET"
+if args.method == "efficientnet":
+    METHOD = f"{args.method}-{args.method_level}"
+else:
+    METHOD = args.method + args.method_level
 Epoch = args.epochs
 BATCH_SIZE = args.batchsize
 lr = args.learning_rate
@@ -56,6 +74,29 @@ resize = args.resize
 resize_size = args.resize_size
 num_classes = 801
 valid_batch_size = args.validbatchsize
+START_EPOCH = 0
+
+
+def getModelPath():
+    start_epoch = args.start_epoch
+    CHECKPOINT_FOLDER = './checkpoints/' + METHOD + '/'
+    files = [x for x in filter(lambda x:re.match(
+        f'.*EPOCH_\d+.pkl', x), os.listdir(CHECKPOINT_FOLDER))]
+    global START_EPOCH
+    if start_epoch == -1:
+        start_epoch = len(files)-1
+    if start_epoch > len(files)-1:
+        print(f"input start epoch {start_epoch} no exist model")
+        return ""
+    if start_epoch == -1:
+        start_epoch = 0
+    for file in files:
+        r = re.match(r'EPOCH_(\d+).pkl', file)
+        num = int(r.groups(1)[0])
+        if num == start_epoch:
+            START_EPOCH = start_epoch
+            return f"{CHECKPOINT_FOLDER}EPOCH_{num}.pkl"
+    return ""
 
 
 def load_label_dic(label_path):
@@ -66,6 +107,17 @@ def load_label_dic(label_path):
     return label_dic
 
 
+def switchModel():
+    if args.method == "efficientnet":
+        model = EfficientNet.from_pretrained(
+            METHOD, in_channels=1, num_classes=num_classes)
+    elif METHOD == "regnet":
+        model = regnety_002(num_classes=num_classes)
+        #
+        # model = globals()[METHOD](num_classes=num_classes)
+    return model
+
+
 def main():
     print("init data folder")
 
@@ -73,6 +125,15 @@ def main():
         os.mkdir('checkpoints')
     if not os.path.exists(str('./checkpoints/' + METHOD)):
         os.mkdir('./checkpoints/' + METHOD)
+
+    model = switchModel()
+    if args.load_model:
+        modelPath = getModelPath()
+        if modelPath != "":
+            model.load_state_dict(torch.load(modelPath))
+        else:
+            print("<load model error>Check whether your method and method_level setting is right. Or set load_model as False without try to load checkpoint model.")
+            exit(-1)
 
     label_dic = load_label_dic(label_path)
     transform = transforms.Compose([
@@ -96,7 +157,8 @@ def main():
     # for resnet
     # model = ResNet18(in_features=in_features, num_classes=num_classes, pretrained=False)
     # for regnet
-    model = RegNetx(in_features, num_classes, model='regnety_320', pretrained=True)
+    model = RegNetx(in_features, num_classes,
+                    model='regnety_320', pretrained=True)
 
     # Efficient Net V1 B0
     # model = EfficientNet.from_pretrained("efficientnet-b0",in_channels=1,num_classes=801)
@@ -171,7 +233,7 @@ def main():
             './checkpoints/' + METHOD + '/' + 'result_param.json'), "w+")
         json.dump(result_param, out_file, indent=4)
 
-    plt.plot(range(1, Epoch + 1), total_training_loss)
+    plt.plot(range(1, Epoch + 1), result['training_loss'])
     plt.title("loss value")
     plt.ylabel("loss value")
     plt.xlabel("epoch")
