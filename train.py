@@ -37,10 +37,12 @@ parser.add_argument("-r", "--resize", type=int, default=True)
 parser.add_argument("-rs", "--resize_size", type=int, default=128)
 parser.add_argument("-vb", "--validbatchsize", type=int, default=64)
 parser.add_argument("-g", "--gpu", type=int, default=0)
+parser.add_argument("-nw","--num_workers",type=int,default=2)
+
 
 ### Checkpoint Path / Select Method ###
 parser.add_argument("-m","--method",type=str,default="efficientnet") #Method save name and load name
-parser.add_argument("-ml","--method_level",type=str,default="-b7") #Method level e.g. b0, b1, b2, b3 or S, M, L
+parser.add_argument("-ml","--method_level",type=str,default="b0") #Method level e.g. b0, b1, b2, b3 or S, M, L
 # final save name => method + method_level , e.g. efficientNetb0
 
 ### Load Model Settings ### 
@@ -61,7 +63,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # print(device)
 
 # Hyper Parameters
-METHOD = args.method + args.method_level
+if args.method=="efficientnet" :
+    METHOD = f"{args.method}-{args.method_level}"
+else:   
+    METHOD = args.method + args.method_level
 Epoch = args.epochs
 BATCH_SIZE = args.batchsize
 lr = args.learning_rate
@@ -70,12 +75,13 @@ resize = args.resize
 resize_size = args.resize_size
 num_classes = 801
 valid_batch_size = args.validbatchsize
- 
+START_EPOCH=0
 
 def getModelPath():
     start_epoch=args.start_epoch
     CHECKPOINT_FOLDER= './checkpoints/' + METHOD + '/'
     files = [x for x in filter(lambda x:re.match(f'.*EPOCH_\d+.pkl',x),os.listdir(CHECKPOINT_FOLDER))]
+    global START_EPOCH
     if start_epoch==-1:
         start_epoch=len(files)-1
     if start_epoch>len(files)-1:
@@ -87,6 +93,7 @@ def getModelPath():
         r=re.match(r'EPOCH_(\d+).pkl',file)
         num=int(r.groups(1)[0])
         if num == start_epoch:
+            START_EPOCH=start_epoch
             return f"{CHECKPOINT_FOLDER}EPOCH_{num}.pkl"
     return ""
 
@@ -138,10 +145,10 @@ def main():
         dataset, [train_set_size, valid_set_size])
 
     train_dataloader = DataLoader(
-        train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=8)
+        train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=args.num_workers)
 
     valid_dataloader = DataLoader(
-        valid_dataset, batch_size=valid_batch_size, pin_memory=True, num_workers=8)
+        valid_dataset, batch_size=valid_batch_size, pin_memory=True, num_workers=args.num_workers)
 
     in_features = dataset[0][0].shape[0]
     # for resnet
@@ -161,7 +168,7 @@ def main():
     result_param = {'training_loss': [], 'training_accuracy': [],
                     'validation_loss': [], 'validation_accuracy': []}
 
-    for epoch in range(Epoch):
+    for epoch in range(START_EPOCH,Epoch):
         train_bar = tqdm(train_dataloader)
         since = time.time()
         running_training_loss = 0
