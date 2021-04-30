@@ -149,10 +149,10 @@ def main():
         dataset, [train_set_size, valid_set_size])
 
     train_dataloader = DataLoader(
-        train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=4)
+        train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=args.num_workers)
 
     valid_dataloader = DataLoader(
-        valid_dataset, batch_size=valid_batch_size, pin_memory=True, num_workers=4)
+         valid_dataset, batch_size=valid_batch_size, pin_memory=True, num_workers=args.num_workers)
 
     in_features = dataset[0][0].shape[0]
     # for resnet
@@ -175,7 +175,7 @@ def main():
     result_param = {'training_loss': [], 'training_accuracy': [],
                     'validation_loss': [], 'validation_accuracy': []}
 
-    for epoch in range(Epoch):
+    for epoch in range(start_epoch,Epoch):
         train_bar = tqdm(train_dataloader)
         since = time.time()
         running_training_loss = 0
