@@ -25,6 +25,14 @@ except ImportError:
     print('tqdm could not be imported. If you want to use progress bar during training,'
           'install tqdm from https://github.com/tqdm/tqdm.')
 
+def str2bool(v):  
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):  
+        return True  
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):  
+        return False  
+    else:  
+        raise argparse.ArgumentTypeError('Boolean value expected.')  
+
 parser = argparse.ArgumentParser(
     description="ESun Competition HandWrite Recognition")
 parser.add_argument("-e", "--epochs", type=int, default=100)
@@ -47,7 +55,7 @@ parser.add_argument("-ml", "--method_level", type=str, default="b0")
 ### Load Model Settings ###
 # Load from epoch, -1 = final epoch in checkpoint
 parser.add_argument("-se", "--start_epoch", type=int, default=-1)
-parser.add_argument("-L", "--load_model", type=bool,
+parser.add_argument("-L", "--load_model", type=str2bool,
                     default=False)  # Load model or train from 0
 
 args = parser.parse_args()
