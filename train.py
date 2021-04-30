@@ -72,6 +72,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Hyper Parameters
 if args.method == "efficientnet":
     METHOD = f"{args.method}-{args.method_level}"
+elif args.method == 'regnet':
+    METHOD = args.method
 else:
     METHOD = args.method + args.method_level
 Epoch = args.epochs
@@ -115,7 +117,7 @@ def load_label_dic(label_path):
     return label_dic
 
 
-def switchModel():
+def switchModel(in_features = 0):
     if args.method == "efficientnet":
         model = EfficientNet.from_pretrained(
             METHOD, in_channels=1, num_classes=num_classes)
@@ -135,15 +137,6 @@ def main():
     if not os.path.exists(str('./checkpoints/' + METHOD)):
         os.mkdir('./checkpoints/' + METHOD)
 
-    model = switchModel()
-    if args.load_model:
-        modelPath = getModelPath()
-        if modelPath != "":
-            model.load_state_dict(torch.load(modelPath))
-        else:
-            print("<load model error>Check whether your method and method_level setting is right. Or set load_model as False without try to load checkpoint model.")
-            exit(-1)
-
     label_dic = load_label_dic(label_path)
     transform = transforms.Compose([
         transforms.ToTensor(),
@@ -162,7 +155,16 @@ def main():
     valid_dataloader = DataLoader(
          valid_dataset, batch_size=valid_batch_size, pin_memory=True, num_workers=args.num_workers)
 
-    in_features = dataset[0][0].shape[0]
+    print(f"model is {METHOD}")
+    model = switchModel(in_features = dataset[0][0].shape[0])
+    if args.load_model:
+        modelPath = getModelPath()
+        if modelPath != "":
+            model.load_state_dict(torch.load(modelPath))
+        else:
+            print("<load model error>Check whether your method and method_level setting is right. Or set load_model as False without try to load checkpoint model.")
+            exit(-1)
+
     # for resnet
     # model = ResNet18(in_features=in_features, num_classes=num_classes, pretrained=False)
     # for regnet
