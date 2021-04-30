@@ -16,8 +16,8 @@ import argparse
 import torch.utils.data as data
 import json
 
-# Efficient Net V1
-# from efficientnet_pytorch import EfficientNet
+##### Efficient Net V1
+from efficientnet_pytorch import EfficientNet
 
 try:
     from tqdm import tqdm
@@ -48,7 +48,7 @@ parser.add_argument("-ml", "--method_level", type=str, default="b0")
 # Load from epoch, -1 = final epoch in checkpoint
 parser.add_argument("-se", "--start_epoch", type=int, default=-1)
 parser.add_argument("-L", "--load_model", type=bool,
-                    default=True)  # Load model or train from 0
+                    default=False)  # Load model or train from 0
 
 args = parser.parse_args()
 
@@ -175,7 +175,7 @@ def main():
     result_param = {'training_loss': [], 'training_accuracy': [],
                     'validation_loss': [], 'validation_accuracy': []}
 
-    for epoch in range(start_epoch,Epoch):
+    for epoch in range(START_EPOCH, Epoch):
         train_bar = tqdm(train_dataloader)
         since = time.time()
         running_training_loss = 0
