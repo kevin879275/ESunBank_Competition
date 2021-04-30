@@ -112,7 +112,8 @@ def switchModel():
         model = EfficientNet.from_pretrained(
             METHOD, in_channels=1, num_classes=num_classes)
     elif METHOD == "regnet":
-        model = regnety_002(num_classes=num_classes)
+        model = RegNetx(in_features, num_classes,
+                model='regnety_320', pretrained=True)
         #
         # model = globals()[METHOD](num_classes=num_classes)
     return model
@@ -157,8 +158,7 @@ def main():
     # for resnet
     # model = ResNet18(in_features=in_features, num_classes=num_classes, pretrained=False)
     # for regnet
-    model = RegNetx(in_features, num_classes,
-                    model='regnety_320', pretrained=True)
+
 
     # Efficient Net V1 B0
     # model = EfficientNet.from_pretrained("efficientnet-b0",in_channels=1,num_classes=801)
