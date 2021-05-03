@@ -17,7 +17,7 @@ import torch.utils.data as data
 import json
 
 ##### Efficient Net V1
-from efficientnet_pytorch import EfficientNet
+# from efficientnet_pytorch import EfficientNet
 
 try:
     from tqdm import tqdm
@@ -30,7 +30,7 @@ def str2bool(v):
         return True  
     elif v.lower() in ('no', 'false', 'f', 'n', '0'):  
         return False  
-    else:  
+    else:
         raise argparse.ArgumentTypeError('Boolean value expected.')  
 
 parser = argparse.ArgumentParser(
@@ -42,7 +42,7 @@ parser.add_argument("-s", "--split_rate", type=float, default=0.8)
 parser.add_argument("-r", "--resize", type=int, default=True)
 parser.add_argument("-rs", "--resize_size", type=int, default=128)
 parser.add_argument("-vb", "--validbatchsize", type=int, default=64)
-parser.add_argument("-g", "--gpu", type=int, default=0)
+parser.add_argument('--use_gpu', dest='use_gpu', type=str2bool, default=True, help='use gpu')
 parser.add_argument("-nw", "--num_workers", type=int, default=2)
 
 ### Checkpoint Path / Select Method ###
@@ -65,9 +65,6 @@ image_path = './train_image'
 path = './data'
 label_path = 'training data dic.txt'
 
-# Environment
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# print(device)
 
 # Hyper Parameters
 if args.method == "efficientnet":
@@ -86,6 +83,13 @@ num_classes = 801
 valid_batch_size = args.validbatchsize
 START_EPOCH = 0
 
+# Environment
+if args.use_gpu and torch.cuda.is_available():
+    device = torch.device('cuda')
+    torch.backends.cudnn.benchmark = True
+else:
+    device = torch.device('cpu')
+    print('Warning! Using CPU.')
 
 def getModelPath():
     start_epoch = args.start_epoch
@@ -123,7 +127,7 @@ def switchModel(in_features = 0):
             METHOD, in_channels=1, num_classes=num_classes)
     elif METHOD == "regnet":
         model = RegNetx(in_features, num_classes,
-                model='regnety_320', pretrained=True)
+                model='regnety_002', pretrained=True)
         #
         # model = globals()[METHOD](num_classes=num_classes)
     return model
@@ -173,7 +177,7 @@ def main():
     # Efficient Net V1 B0
     # model = EfficientNet.from_pretrained("efficientnet-b0",in_channels=1,num_classes=801)
 
-    model.cuda()
+    model.to(device)
     # in_features = dataset[0][0].shape[1]*dataset[0][0].shape[2]
     # model = Model(in_features=in_features).to(device)
     # summary(model, (1, resize_size, resize_size))
@@ -186,13 +190,13 @@ def main():
                     'validation_loss': [], 'validation_accuracy': []}
 
     for epoch in range(START_EPOCH, Epoch):
-        train_bar = tqdm(train_dataloader)
         since = time.time()
         running_training_loss = 0
         running_training_correct = 0
         running_valid_loss = 0
         running_valid_correct = 0
         model.train()
+        train_bar = tqdm(train_dataloader)
         for imgs, label in train_bar:
             imgs = imgs.to(device)
             label = label.to(device)
@@ -204,13 +208,17 @@ def main():
             running_training_loss += loss_val
             loss_val.backward()
             optimizer.step()
+            # train_bar.set_description(desc='[%d/%d] | Train Loss:%.4f' %
+            #                                (epoch + 1, Epoch, loss_val.item()))
         with torch.no_grad():
             model.eval()
-            for imgs, label in valid_dataloader:
+            val_bar = tqdm(valid_dataloader)
+            for imgs, label in val_bar:
                 imgs = imgs.to(device)
                 label = label.to(device)
                 out = model(imgs)
                 loss_val = loss(out, label)
+                val_bar.set_description(desc='[%d/%d] | Validation Loss:%.4f' % (epoch + 1, Epoch, loss_val.item()))
                 _, pred_class = torch.max(out.data, 1)
                 running_valid_correct += torch.sum(pred_class == label)
                 running_valid_loss += loss_val
@@ -230,12 +238,6 @@ def main():
         now_time = time.time() - since
         print("Training time is:{:.0f}m {:.0f}s".format(
             now_time // 60, now_time % 60))
-
-        train_bar.set_description(desc='[%d/%d] | Train Loss:%.4f | Train Accuracy:%.4f | Validation Loss:%.4f '
-                                       '| Validation Accuracy:%.4f | Training time:%.0f' %
-                                       (epoch+1, Epoch, result_param['training_loss'][-1], result_param['training_accuracy'][-1],
-                                        result_param['validation_loss'][-1],
-                                        result_param['validation_accuracy'][-1], now_time))
 
         torch.save(model.state_dict(), str(
             './checkpoints/' + METHOD + '/' + "EPOCH_" + str(epoch) + ".pkl"))
