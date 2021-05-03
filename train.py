@@ -17,7 +17,7 @@ import torch.utils.data as data
 import json
 
 ##### Efficient Net V1
-# from efficientnet_pytorch import EfficientNet
+from efficientnet_pytorch import EfficientNet
 
 try:
     from tqdm import tqdm
@@ -147,7 +147,6 @@ def main():
     ])
     dataset = ChineseHandWriteDataset(root=image_path, label_dic=label_dic, transform=transform, resize=resize,
                                       resize_size=resize_size)
-
     train_set_size = int(len(dataset)*split_rate)
     valid_set_size = len(dataset) - train_set_size
     train_dataset, valid_dataset = data.random_split(
@@ -208,8 +207,8 @@ def main():
             running_training_loss += loss_val
             loss_val.backward()
             optimizer.step()
-            # train_bar.set_description(desc='[%d/%d] | Train Loss:%.4f' %
-            #                                (epoch + 1, Epoch, loss_val.item()))
+            train_bar.set_description(desc='[%d/%d] | Train Loss:%.4f' %
+                                           (epoch + 1, Epoch, loss_val.item()))
         with torch.no_grad():
             model.eval()
             val_bar = tqdm(valid_dataloader)
