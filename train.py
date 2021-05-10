@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import argparse
 import torch.utils.data as data
 import json
+from torchvision.datasets import ImageFolder
 
 ##### Efficient Net V1
 from efficientnet_pytorch import EfficientNet
@@ -145,8 +146,15 @@ def main():
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
-    dataset = ChineseHandWriteDataset(root=image_path, label_dic=label_dic, transform=transform, resize=resize,
-                                      resize_size=resize_size)
+    
+    clean_image_path = './clean_data/data'
+    clean_transform = transforms.Compose([
+        transforms.Grayscale(num_output_channels=1),
+        transforms.ToTensor(),
+    ])
+    dataset = ImageFolder(clean_image_path,transform=clean_transform)
+    # dataset = ChineseHandWriteDataset(root=image_path, label_dic=label_dic, transform=transform, resize=resize,
+    #                                   resize_size=resize_size)
     train_set_size = int(len(dataset)*split_rate)
     valid_set_size = len(dataset) - train_set_size
     train_dataset, valid_dataset = data.random_split(
