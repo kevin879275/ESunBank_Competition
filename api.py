@@ -299,7 +299,7 @@ def inference():
         # You can write some log...
         raise e
     answer=getWordFromResult(result)
-    server_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    server_timestamp = time.time()
 
     return jsonify({'esun_uuid': data['esun_uuid'],
                     'server_uuid': server_uuid,
