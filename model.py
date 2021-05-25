@@ -116,7 +116,6 @@ class SmoothCrossEntropyLoss(_WeightedLoss):
         return self.reduce_loss(-(targets * log_preds).sum(dim=-1))
 
 
-__all__ = ['effnetv2_s', 'effnetv2_m', 'effnetv2_l', 'effnetv2_xl','efficientnetV2']
 
 
 def _make_divisible(v, divisor, min_value=None):
