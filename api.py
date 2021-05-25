@@ -165,6 +165,8 @@ def switchModel(in_features = 0):
     elif METHOD == "regnet":
         model = RegNetx(in_features, num_classes,
                 model='regnety_002', pretrained=True)
+    elif METHOD == "efficientnetV2":
+        model = efficientnetV2[args.method_level]()
         #
         # model = globals()[METHOD](num_classes=num_classes)
     return model
