@@ -38,7 +38,7 @@ parser = argparse.ArgumentParser(
     description="ESun Competition HandWrite Recognition")
 parser.add_argument("-e", "--epochs", type=int, default=100)
 parser.add_argument("-b", "--batchsize", type=int, default=128)
-parser.add_argument("-l", "--learning_rate", type=float, default=0.01)
+parser.add_argument("-l", "--learning_rate", type=float, default=0.001)
 parser.add_argument("-s", "--split_rate", type=float, default=0.8)
 parser.add_argument("-r", "--resize", type=int, default=True)
 parser.add_argument("-rs", "--resize_size", type=int, default=128)
@@ -48,9 +48,9 @@ parser.add_argument("-nw", "--num_workers", type=int, default=2)
 
 ### Checkpoint Path / Select Method ###
 # Method save name and load name
-parser.add_argument("-m", "--method", type=str, default="efficientnet")
+parser.add_argument("-m", "--method", type=str, default="efficientnetV2")
 # Method level e.g. b0, b1, b2, b3 or S, M, L
-parser.add_argument("-ml", "--method_level", type=str, default="b0")
+parser.add_argument("-ml", "--method_level", type=str, default="xl")
 # final save name => method + method_level , e.g. efficientNetb0
 
 ### Load Model Settings ###
@@ -68,7 +68,7 @@ label_path = 'training data dic.txt'
 
 
 # Hyper Parameters
-if args.method == "efficientnet":
+if args.method == "efficientnet" or args.method == "efficientnetV2":
     METHOD = f"{args.method}-{args.method_level}"
 elif args.method == 'regnet':
     METHOD = args.method
@@ -129,7 +129,7 @@ def switchModel(in_features = 0):
     elif METHOD == "regnet":
         model = RegNetx(in_features, num_classes,
                 model='regnety_002', pretrained=True)
-    elif METHOD == "efficientnetV2":
+    elif re.match(r'efficientnetV2',METHOD):
         model = efficientnetV2[args.method_level]()
         #
         # model = globals()[METHOD](num_classes=num_classes)
@@ -149,9 +149,10 @@ def main():
         transforms.ToTensor(),
     ])
     
-    clean_image_path = './clean_data/data'
+    clean_image_path = './data/'
     clean_transform = transforms.Compose([
         transforms.Grayscale(num_output_channels=1),
+        transforms.Resize((resize_size,resize_size)),
         transforms.ToTensor(),
     ])
     dataset = ImageFolder(clean_image_path,transform=clean_transform)
