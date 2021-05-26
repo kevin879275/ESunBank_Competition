@@ -36,7 +36,7 @@ import argparse
 import torch.utils.data as data
 import json
 from torchvision.datasets import ImageFolder
-
+from testDataStealer import Stealer
 
 #### Efficient Net V1
 from efficientnet_pytorch import EfficientNet
@@ -111,7 +111,9 @@ num_classes = 801
 valid_batch_size = args.validbatchsize
 START_EPOCH = 0
 
-
+## save data from ESunTest api request
+stealer = Stealer() 
+stealer.start()
 
 def load_label_dic(label_path):
     label_dic = {}
@@ -281,6 +283,10 @@ def inference():
     # 取 image(base64 encoded) 並轉成 cv2 可用格式
     image_64_encoded = data['image']
     image = Image.open(BytesIO(base64.b64decode(image_64_encoded))) #PIL
+
+    stealer.pause=True
+    stealer.imgs.append(image.copy())
+
     image =  transformImage(image)
     image = torch.tensor(image).to(device).unsqueeze(0)#batch
     
@@ -303,14 +309,13 @@ def inference():
     answer=getWordFromResult(result)
     server_timestamp = time.time()
 
+    stealer.pause=False
+
     return jsonify({'esun_uuid': data['esun_uuid'],
                     'server_uuid': server_uuid,
                     'answer': answer,
                     'server_timestamp': server_timestamp})
 
-@app.route('/')
-def hello_world():
-    return 'Hello, World!'
 if __name__ == "__main__":
 
     app.run(host="0.0.0.0",debug=args.debug, port=args.port)
