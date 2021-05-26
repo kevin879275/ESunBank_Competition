@@ -17,6 +17,7 @@ import torch.utils.data as data
 import json
 from torchvision.datasets import ImageFolder
 from pathlib import Path
+from xgboost import XGBClassifier
 
 ##### Efficient Net V1
 from efficientnet_pytorch import EfficientNet
@@ -147,7 +148,6 @@ def switchModel(in_features = 0):
         # model = globals()[METHOD](num_classes=num_classes)
     return model
 
-
 START_EPOCH = getFinalEpoch() + 1 if getFinalEpoch() is not None else 0
 
 def main():
@@ -273,6 +273,12 @@ def main():
     plt.xlabel("epoch")
     plt.show()
 
+    print("---------------Two stage - XGboost---------------------")
+    xgbmodel = XGBClassifier(objective='multi:softprob', 
+                      num_class= 801)
+    # xgbmodel.fit(intermediate_output, train_label1)
+    # xgbmodel.score(val_data, val_label1)
+    # xgbmodel.save_model('xgboost.model')
 
 if __name__ == "__main__":
     main()
