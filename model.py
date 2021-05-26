@@ -341,3 +341,25 @@ efficientnetV2={
         "m":effnetv2_m,
         "s":effnetv2_s
     }
+
+
+def CustomPredict(model, input):
+    """EfficientNet's forward function.
+        Calls extract_features to extract features, applies final linear layer, and returns logits.
+
+    Args:
+        inputs (tensor): Input tensor.
+
+    Returns:
+        Output of this model after processing.
+    """
+    # Convolution layers
+    x = model.extract_features(input)
+    # Pooling and final linear layer
+    x = model._avg_pooling(x)
+    if model._global_params.include_top:
+        x = x.flatten(start_dim=1)
+        x = model._dropout(x)
+        # No fc
+        # x = model._fc(x)
+    return x
