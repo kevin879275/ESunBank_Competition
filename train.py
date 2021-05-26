@@ -16,6 +16,7 @@ import argparse
 import torch.utils.data as data
 import json
 from torchvision.datasets import ImageFolder
+from pathlib import Path
 
 ##### Efficient Net V1
 from efficientnet_pytorch import EfficientNet
@@ -37,7 +38,7 @@ def str2bool(v):
 parser = argparse.ArgumentParser(
     description="ESun Competition HandWrite Recognition")
 parser.add_argument("-e", "--epochs", type=int, default=100)
-parser.add_argument("-b", "--batchsize", type=int, default=128)
+parser.add_argument("-b", "--batchsize", type=int, default=64)
 parser.add_argument("-l", "--learning_rate", type=float, default=0.001)
 parser.add_argument("-s", "--split_rate", type=float, default=0.8)
 parser.add_argument("-r", "--resize", type=int, default=True)
@@ -45,7 +46,7 @@ parser.add_argument("-rs", "--resize_size", type=int, default=128)
 parser.add_argument("-vb", "--validbatchsize", type=int, default=64)
 parser.add_argument('--use_gpu', dest='use_gpu', type=str2bool, default=True, help='use gpu')
 parser.add_argument("-nw", "--num_workers", type=int, default=2)
-
+parser.add_argument("-sd", "--seed", type=int, default=1) # spilt random Seed 
 ### Checkpoint Path / Select Method ###
 # Method save name and load name
 parser.add_argument("-m", "--method", type=str, default="efficientnetV2")
@@ -82,8 +83,8 @@ resize = args.resize
 resize_size = args.resize_size
 num_classes = 801
 valid_batch_size = args.validbatchsize
-START_EPOCH = 0
-
+START_EPOCH =  0
+CHECKPOINT_FOLDER = './checkpoints/' + METHOD + '/'
 # Environment
 if args.use_gpu and torch.cuda.is_available():
     device = torch.device('cuda')
@@ -92,25 +93,36 @@ else:
     device = torch.device('cpu')
     print('Warning! Using CPU.')
 
-def getModelPath():
+
+def getFinalEpoch(): #return last epoch num (final training saved)
+
     start_epoch = args.start_epoch
-    CHECKPOINT_FOLDER = './checkpoints/' + METHOD + '/'
+    p=Path(CHECKPOINT_FOLDER)
+    if not p.exists():
+        return None
     files = [x for x in filter(lambda x:re.match(
         f'.*EPOCH_\d+.pkl', x), os.listdir(CHECKPOINT_FOLDER))]
-    global START_EPOCH
     if start_epoch == -1:
         start_epoch = len(files)-1
     if start_epoch > len(files)-1:
         print(f"input start epoch {start_epoch} no exist model")
-        return ""
+        return None
     if start_epoch == -1:
         start_epoch = 0
     for file in files:
         r = re.match(r'EPOCH_(\d+).pkl', file)
         num = int(r.groups(1)[0])
         if num == start_epoch:
-            START_EPOCH = start_epoch
-            return f"{CHECKPOINT_FOLDER}EPOCH_{num}.pkl"
+            return num
+    return None
+
+
+
+
+def getModelPath():
+    num=getFinalEpoch()
+    if num is not None :
+        return f"{CHECKPOINT_FOLDER}EPOCH_{num}.pkl"
     return ""
 
 
@@ -136,6 +148,8 @@ def switchModel(in_features = 0):
     return model
 
 
+START_EPOCH = getFinalEpoch() + 1 if getFinalEpoch is not None else 0
+
 def main():
     print("init data folder")
 
@@ -158,10 +172,11 @@ def main():
     dataset = ImageFolder(clean_image_path,transform=clean_transform)
     # dataset = ChineseHandWriteDataset(root=image_path, label_dic=label_dic, transform=transform, resize=resize,
     #                                   resize_size=resize_size)
+        
     train_set_size = int(len(dataset)*split_rate)
     valid_set_size = len(dataset) - train_set_size
-    train_dataset, valid_dataset = data.random_split(
-        dataset, [train_set_size, valid_set_size])
+    train_dataset, valid_dataset = data.random_split(dataset, [train_set_size, valid_set_size],torch.Generator().manual_seed(args.seed))
+
 
     train_dataloader = DataLoader(
         train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=args.num_workers)
