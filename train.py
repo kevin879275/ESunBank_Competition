@@ -59,7 +59,7 @@ parser.add_argument("-ml", "--method_level", type=str, default="m")
 # Load from epoch, -1 = final epoch in checkpoint
 parser.add_argument("-se", "--start_epoch", type=int, default=-1)
 parser.add_argument("-L", "--load_model", type=str2bool,
-                    default=False)  # Load model or train from 0
+                    default=True)  # Load model or train from 0
 
 args = parser.parse_args()
 
@@ -103,18 +103,22 @@ def getFinalEpoch(): #return last epoch num (final training saved)
         return None
     files = [x for x in filter(lambda x:re.match(
         f'.*EPOCH_\d+.pkl', x), os.listdir(CHECKPOINT_FOLDER))]
-    if start_epoch == -1:
-        start_epoch = len(files)-1
-    if start_epoch > len(files)-1:
-        print(f"input start epoch {start_epoch} no exist model")
+    nums= [int(re.match(r'EPOCH_(\d+).pkl', x).group(1)) for x in files]
+    
+
+
+    if len(files)==0 :
+        if start_epoch != -1:
+            print(f"<Warning> No such a Start epoch checkpoint file #{start_epoch} exists, which is file {CHECKPOINT_FOLDER}EPOCH_{start_epoch}.pkl")
         return None
-    if start_epoch == -1:
-        start_epoch = 0
-    for file in files:
-        r = re.match(r'EPOCH_(\d+).pkl', file)
-        num = int(r.groups(1)[0])
-        if num == start_epoch:
-            return num
+
+    if start_epoch==-1:
+        return max(nums)
+    # search specific number 
+    if start_epoch in nums:
+        return start_epoch
+    else:
+        print(f"<Warning> No such a Start epoch checkpoint file #{start_epoch} exists, which is file {CHECKPOINT_FOLDER}EPOCH_{start_epoch}.pkl")
     return None
 
 
@@ -132,6 +136,7 @@ def load_label_dic(label_path):
     f = open(label_path, 'r', encoding="utf-8")
     for idx, line in enumerate(f.readlines()):
         label_dic[line[0]] = idx
+    label_dic[800] = "is_null"
     return label_dic
 
 
@@ -267,18 +272,6 @@ def main():
             './checkpoints/' + METHOD + '/' + 'result_param.json'), "w+")
         json.dump(result_param, out_file, indent=4)
 
-    plt.plot(range(1, Epoch + 1), result['training_loss'])
-    plt.title("loss value")
-    plt.ylabel("loss value")
-    plt.xlabel("epoch")
-    plt.show()
-
-    print("---------------Two stage - XGboost---------------------")
-    xgbmodel = XGBClassifier(objective='multi:softprob', 
-                      num_class= 801)
-    # xgbmodel.fit(intermediate_output, train_label1)
-    # xgbmodel.score(val_data, val_label1)
-    # xgbmodel.save_model('xgboost.model')
 
 if __name__ == "__main__":
     main()
