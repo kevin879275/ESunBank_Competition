@@ -121,6 +121,26 @@ def getFinalEpoch():  # return last epoch num (final training saved)
     return None
 
 
+'''Argumentation'''
+
+def mixup(x, y, alpha=1.0, use_cuda=args.use_gpu):
+
+    '''Compute the mixup data. Return mixed inputs, pairs of targets, and lambda'''
+    if alpha > 0.:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1.
+    batch_size = x.size()[0]
+    if use_cuda:
+        index = torch.randperm(batch_size).cuda()
+    else:
+        index = torch.randperm(batch_size)
+
+    mixed_x = lam * x + (1 - lam) * x[index,:]
+
+    mixed_y = lam * y + (1 - lam) * y[index]
+    return mixed_x, mixed_y
+
 def getModelPath():
     num = getFinalEpoch()
     if num is not None:
