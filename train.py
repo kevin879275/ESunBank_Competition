@@ -136,7 +136,7 @@ def load_label_dic(label_path):
     f = open(label_path, 'r', encoding="utf-8")
     for idx, line in enumerate(f.readlines()):
         label_dic[line[0]] = idx
-    label_dic[800] = "is_null"
+    label_dic[800] = "isnull"
     return label_dic
 
 
