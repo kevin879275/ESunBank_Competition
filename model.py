@@ -1,10 +1,13 @@
 import torch
 import torch.nn as nn
 from torch.nn.modules.loss import _WeightedLoss
+from torch.autograd import Variable
 import torch.nn.functional as F
 import torchvision
 import timm
 import math
+
+
 class ResNet18(nn.Module):
     def __init__(self, in_features, num_classes, pretrained=False):
         super(ResNet18, self).__init__()
@@ -116,6 +119,18 @@ class SmoothCrossEntropyLoss(_WeightedLoss):
         return self.reduce_loss(-(targets * log_preds).sum(dim=-1))
 
 
+class FocalLoss(nn.modules.loss._WeightedLoss):
+    def __init__(self, weight=None, gamma=2,reduction='mean'):
+        super(FocalLoss, self).__init__(weight,reduction=reduction)
+        self.gamma = gamma
+        self.weight = weight #weight parameter will act as the alpha parameter to balance class weights
+
+    def forward(self, input, target):
+
+        ce_loss = F.cross_entropy(input, target,reduction=self.reduction,weight=self.weight)
+        pt = torch.exp(-ce_loss)
+        focal_loss = ((1 - pt) ** self.gamma * ce_loss).mean()
+        return focal_loss
 
 
 def _make_divisible(v, divisor, min_value=None):
