@@ -59,7 +59,7 @@ parser.add_argument("-ml", "--method_level", type=str, default="m")
 # Load from epoch, -1 = final epoch in checkpoint
 parser.add_argument("-se", "--start_epoch", type=int, default=-1)
 parser.add_argument("-L", "--load_model", type=str2bool,
-                    default=True)  # Load model or train from 0
+                    default=False)  # Load model or train from 0
 
 args = parser.parse_args()
 
@@ -168,15 +168,15 @@ def main():
         transforms.ToTensor(),
     ])
     
-    clean_image_path = './data/'
+    clean_image_path = './train_image/'
     clean_transform = transforms.Compose([
         transforms.Grayscale(num_output_channels=1),
         transforms.Resize((resize_size,resize_size)),
         transforms.ToTensor(),
     ])
-    dataset = ImageFolder(clean_image_path,transform=clean_transform)
-    # dataset = ChineseHandWriteDataset(root=image_path, label_dic=label_dic, transform=transform, resize=resize,
-    #                                   resize_size=resize_size)
+    # dataset = ImageFolder(clean_image_path,transform=clean_transform)
+    dataset = ChineseHandWriteDataset(root=image_path, label_dic=label_dic, transform=transform, resize=resize,
+                                       resize_size=resize_size)
         
     train_set_size = int(len(dataset)*split_rate)
     valid_set_size = len(dataset) - train_set_size

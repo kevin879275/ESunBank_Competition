@@ -23,18 +23,24 @@ unsuitable_data = ['10412_家.jpg',
 '66241_悅.jpg']
 class ChineseHandWriteDataset(Dataset):
     def __init__(self, root="", label_dic={}, transform=None, resize=True, resize_size=128):
-        self.imgfile = []
+        self.img_file = []
         self.labelfile = []
         self.transform = transform
         self.root = root
         self.resize = resize
         self.resize_size = resize_size
         self.label_dic = label_dic
-        self.img_file = os.listdir(self.root)
+        for root, dirs, files in os.walk(self.root, topdown=False):
+            for name in files:
+                self.img_file.append(os.path.join(root, name))
+            
+               
+       
+            # self.imgfile.sort(key=lambda x: (os.path.getsize(self.root+"/" +x),int(x[:-4])))
         # remove width < 10 or height < 10 image
-        for i in unsuitable_data:
-            if i in self.img_file:
-                self.img_file.remove(i)
+        # for i in unsuitable_data:
+        #     if i in self.img_file:
+        #         self.img_file.remove(i)
         # for dir in os.listdir(root):
         #     dir_path = root + '/' + dir
         #     if dir == 'image':
@@ -49,13 +55,13 @@ class ChineseHandWriteDataset(Dataset):
         #             self.label = np.load(self.labelfile[0])
 
     def __getitem__(self, index):
-        img_path = self.root + '/' + self.img_file[index]
+        img_path =  self.img_file[index]
         img = Image.open(img_path).convert('L')
         label_chinese = img_path[-5:-4]
         if label_chinese in self.label_dic:
             label = self.label_dic[label_chinese]
         else:
-            label = 801
+            label = 800
         if self.resize:
             img = img.resize((self.resize_size, self.resize_size))
 
