@@ -28,13 +28,15 @@ except ImportError:
     print('tqdm could not be imported. If you want to use progress bar during training,'
           'install tqdm from https://github.com/tqdm/tqdm.')
 
-def str2bool(v):  
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):  
-        return True  
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):  
-        return False  
+
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
     else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')  
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 
 parser = argparse.ArgumentParser(
     description="ESun Competition HandWrite Recognition")
@@ -47,7 +49,7 @@ parser.add_argument("-rs", "--resize_size", type=int, default=128)
 parser.add_argument("-vb", "--validbatchsize", type=int, default=32)
 parser.add_argument('--use_gpu', dest='use_gpu', type=str2bool, default=True, help='use gpu')
 parser.add_argument("-nw", "--num_workers", type=int, default=1)
-parser.add_argument("-sd", "--seed", type=int, default=1) # spilt random Seed 
+parser.add_argument("-sd", "--seed", type=int, default=1)  # spilt random Seed
 ### Checkpoint Path / Select Method ###
 # Method save name and load name
 parser.add_argument("-m", "--method", type=str, default="efficientnetV2")
@@ -68,7 +70,6 @@ image_path = './train_image'
 path = './data'
 label_path = 'training data dic.txt'
 
-
 # Hyper Parameters
 if args.method == "efficientnet" or args.method == "efficientnetV2":
     METHOD = f"{args.method}-{args.method_level}"
@@ -84,8 +85,9 @@ resize = args.resize
 resize_size = args.resize_size
 num_classes = 801
 valid_batch_size = args.validbatchsize
-START_EPOCH =  0
+START_EPOCH = 0
 CHECKPOINT_FOLDER = './checkpoints/' + METHOD + '/'
+is_useweight = True
 # Environment
 if args.use_gpu and torch.cuda.is_available():
     device = torch.device('cuda')
@@ -95,38 +97,36 @@ else:
     print('Warning! Using CPU.')
 
 
-def getFinalEpoch(): #return last epoch num (final training saved)
+def getFinalEpoch():  # return last epoch num (final training saved)
 
     start_epoch = args.start_epoch
-    p=Path(CHECKPOINT_FOLDER)
+    p = Path(CHECKPOINT_FOLDER)
     if not p.exists():
         return None
-    files = [x for x in filter(lambda x:re.match(
+    files = [x for x in filter(lambda x: re.match(
         f'.*EPOCH_\d+.pkl', x), os.listdir(CHECKPOINT_FOLDER))]
-    nums= [int(re.match(r'EPOCH_(\d+).pkl', x).group(1)) for x in files]
-    
+    nums = [int(re.match(r'EPOCH_(\d+).pkl', x).group(1)) for x in files]
 
-
-    if len(files)==0 :
+    if len(files) == 0:
         if start_epoch != -1:
-            print(f"<Warning> No such a Start epoch checkpoint file #{start_epoch} exists, which is file {CHECKPOINT_FOLDER}EPOCH_{start_epoch}.pkl")
+            print(
+                f"<Warning> No such a Start epoch checkpoint file #{start_epoch} exists, which is file {CHECKPOINT_FOLDER}EPOCH_{start_epoch}.pkl")
         return None
 
-    if start_epoch==-1:
+    if start_epoch == -1:
         return max(nums)
-    # search specific number 
+    # search specific number
     if start_epoch in nums:
         return start_epoch
     else:
-        print(f"<Warning> No such a Start epoch checkpoint file #{start_epoch} exists, which is file {CHECKPOINT_FOLDER}EPOCH_{start_epoch}.pkl")
+        print(
+            f"<Warning> No such a Start epoch checkpoint file #{start_epoch} exists, which is file {CHECKPOINT_FOLDER}EPOCH_{start_epoch}.pkl")
     return None
 
 
-
-
 def getModelPath():
-    num=getFinalEpoch()
-    if num is not None :
+    num = getFinalEpoch()
+    if num is not None:
         return f"{CHECKPOINT_FOLDER}EPOCH_{num}.pkl"
     return ""
 
@@ -140,20 +140,40 @@ def load_label_dic(label_path):
     return label_dic
 
 
-def switchModel(in_features = 0):
+def switchModel(in_features=0):
     if args.method == "efficientnet":
         model = EfficientNet.from_pretrained(
             METHOD, in_channels=1, num_classes=num_classes)
     elif METHOD == "regnet":
         model = RegNetx(in_features, num_classes,
-                model='regnety_002', pretrained=True)
-    elif re.match(r'efficientnetV2',METHOD):
+                        model='regnety_002', pretrained=True)
+    elif re.match(r'efficientnetV2', METHOD):
         model = efficientnetV2[args.method_level]()
         #
         # model = globals()[METHOD](num_classes=num_classes)
     return model
 
+
+def getWeights(root):
+    label_num = {}
+    for i in range(801):
+        label_num[str(i)] = None
+    for idx, dir_ in enumerate(os.listdir(root)):
+        nSamples = len(os.listdir(root + dir_))
+        label_num[dir_] = nSamples
+    sorted_label_num = sorted(label_num.items(), key=lambda item: item[1])
+    median_idx = int(len(sorted_label_num) / 2)
+    median = sorted_label_num[median_idx][1]
+    weights = []
+    for i in label_num:
+        weight = median / label_num[str(i)]
+        weights.append(weight)
+    weights = torch.FloatTensor(weights)
+    return weights
+
+
 START_EPOCH = getFinalEpoch() + 1 if getFinalEpoch() is not None else 0
+
 
 def main():
     print("init data folder")
@@ -167,30 +187,30 @@ def main():
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
-    
+
     clean_image_path = './train_image/'
     clean_transform = transforms.Compose([
         transforms.Grayscale(num_output_channels=1),
-        transforms.Resize((resize_size,resize_size)),
+        transforms.Resize((resize_size, resize_size)),
         transforms.ToTensor(),
     ])
     # dataset = ImageFolder(clean_image_path,transform=clean_transform)
     dataset = ChineseHandWriteDataset(root=image_path, label_dic=label_dic, transform=transform, resize=resize,
-                                       resize_size=resize_size)
-        
-    train_set_size = int(len(dataset)*split_rate)
-    valid_set_size = len(dataset) - train_set_size
-    train_dataset, valid_dataset = data.random_split(dataset, [train_set_size, valid_set_size],torch.Generator().manual_seed(args.seed))
+                                      resize_size=resize_size)
 
+    train_set_size = int(len(dataset) * split_rate)
+    valid_set_size = len(dataset) - train_set_size
+    train_dataset, valid_dataset = data.random_split(dataset, [train_set_size, valid_set_size],
+                                                     torch.Generator().manual_seed(args.seed))
 
     train_dataloader = DataLoader(
         train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=args.num_workers)
 
     valid_dataloader = DataLoader(
-         valid_dataset, batch_size=valid_batch_size, pin_memory=True, num_workers=args.num_workers)
+        valid_dataset, batch_size=valid_batch_size, pin_memory=True, num_workers=args.num_workers)
 
     print(f"model is {METHOD}")
-    model = switchModel(in_features = dataset[0][0].shape[0])
+    model = switchModel(in_features=dataset[0][0].shape[0])
     if args.load_model:
         modelPath = getModelPath()
         if modelPath != "":
@@ -200,7 +220,6 @@ def main():
     # model = ResNet18(in_features=in_features, num_classes=num_classes, pretrained=False)
     # for regnet
 
-
     # Efficient Net V1 B0
     # model = EfficientNet.from_pretrained("efficientnet-b0",in_channels=1,num_classes=801)
 
@@ -208,7 +227,18 @@ def main():
     # in_features = dataset[0][0].shape[1]*dataset[0][0].shape[2]
     # model = Model(in_features=in_features).to(device)
     # summary(model, (1, resize_size, resize_size))
-    loss = SmoothCrossEntropyLoss().to(device)
+
+    # get each class weight
+    weights = None
+    if is_useweight:
+        weights = getWeights(root=clean_image_path)
+
+    # Label smoothing
+    # loss = SmoothCrossEntropyLoss(weight=weights).to(device)
+
+    # Focal Loss
+    loss = FocalLoss(weight=weights).to(device)
+
     optimizer = optim.AdamW(model.parameters(), lr=lr)
 
     print("------------------ training start -----------------")
@@ -259,8 +289,10 @@ def main():
         result_param['validation_accuracy'].append(running_valid_correct.item() /
                                                    valid_set_size)
 
-        print("Epoch:{} Train Loss:{:.4f},  Train Accuracy:{:.4f},  Validation Loss:{:.4f},  Validation Accuracy:{:.4f}".format(
-            epoch+1, result_param['training_loss'][-1], result_param['training_accuracy'][-1], result_param['validation_loss'][-1], result_param['validation_accuracy'][-1]))
+        print(
+            "Epoch:{} Train Loss:{:.4f},  Train Accuracy:{:.4f},  Validation Loss:{:.4f},  Validation Accuracy:{:.4f}".format(
+                epoch + 1, result_param['training_loss'][-1], result_param['training_accuracy'][-1],
+                result_param['validation_loss'][-1], result_param['validation_accuracy'][-1]))
 
         now_time = time.time() - since
         print("Training time is:{:.0f}m {:.0f}s".format(
