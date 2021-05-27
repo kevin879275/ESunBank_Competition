@@ -17,7 +17,7 @@ import torch.utils.data as data
 import json
 from torchvision.datasets import ImageFolder
 from pathlib import Path
-from xgboost import XGBClassifier
+import xgboost
 
 ##### Efficient Net V1
 from efficientnet_pytorch import EfficientNet
@@ -50,6 +50,7 @@ parser.add_argument("-vb", "--validbatchsize", type=int, default=32)
 parser.add_argument('--use_gpu', dest='use_gpu', type=str2bool, default=True, help='use gpu')
 parser.add_argument("-nw", "--num_workers", type=int, default=1)
 parser.add_argument("-sd", "--seed", type=int, default=1)  # spilt random Seed
+parser.add_argument("-xgb", "--xgboost", type=str2bool, default=False) # use xgboost or not
 ### Checkpoint Path / Select Method ###
 # Method save name and load name
 parser.add_argument("-m", "--method", type=str, default="efficientnetV2")
@@ -304,6 +305,55 @@ def main():
             './checkpoints/' + METHOD + '/' + 'result_param.json'), "w+")
         json.dump(result_param, out_file, indent=4)
 
+    if args.xgboost:
+        print("---------------Two stage - XGboost---------------------")
+        with torch.no_grad():
+
+            x_valid, y_valid = [], []
+            val_bar = tqdm(valid_dataloader)
+            for imgs, label in val_bar:
+                imgs = imgs.to(device)
+                label = label.to(device)
+                # to numpy
+                imgs = CustomPredict(model, imgs).cpu().detach().numpy()
+                label = label.cpu().detach().numpy()
+                if not len(x_valid):
+                    x_valid, y_valid = imgs, label
+                else:
+                    x_valid, y_valid = np.concatenate((x_valid, imgs)), np.concatenate((y_valid, label))
+
+            xgb_train, xgb_label = [], []
+            train_bar = tqdm(train_dataloader)
+            for imgs, label in train_bar:
+                imgs = imgs.to(device)
+                label = label.to(device)
+                # to numpy
+                imgs = CustomPredict(model, imgs).cpu().detach().numpy()
+                label = label.cpu().detach().numpy()
+
+                if not len(xgb_train):
+                    xgb_train, xgb_label = imgs, label
+                else:
+                    xgb_train, xgb_label = np.concatenate((xgb_train, imgs)), np.concatenate((xgb_label, label))
+
+            dval = xgboost.DMatrix(x_valid, y_valid)
+            dtrain = xgboost.DMatrix(xgb_train, xgb_label)
+            
+            params = {
+                'max_depth': 5,                 # the maximum depth of each tree
+                'eta': lr,                     # the training step for each iteration
+                'objective': 'multi:softmax',   # multiclass classification using the softmax objective
+                'num_class': 801,                 # the number of classes that exist in this datset
+                'updater' : 'grow_gpu_hist',
+                'tree_method': 'gpu_hist',
+            } 
+            
+            xgbmodel = xgboost.Booster()
+            # xgbmodel.load_model('xgboost.model')
+            xgbmodel = xgboost.train(params, dtrain, num_boost_round=100, evals=[(dval, 'val'), (dtrain, 'train')])        
+
+            print(sum(xgbmodel.predict(dval) == y_valid) / len(y_valid))
+            xgbmodel.save_model('xgboost.model')
 
 if __name__ == "__main__":
     main()
