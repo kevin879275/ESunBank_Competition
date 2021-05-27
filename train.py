@@ -58,7 +58,7 @@ parser.add_argument("-ml", "--method_level", type=str, default="m")
 # Load from epoch, -1 = final epoch in checkpoint
 parser.add_argument("-se", "--start_epoch", type=int, default=-1)
 parser.add_argument("-L", "--load_model", type=str2bool,
-                    default=False)  # Load model or train from 0
+                    default=True)  # Load model or train from 0
 
 args = parser.parse_args()
 
@@ -131,6 +131,7 @@ def load_label_dic(label_path):
     f = open(label_path, 'r', encoding="utf-8")
     for idx, line in enumerate(f.readlines()):
         label_dic[line[0]] = idx
+    label_dic[800] = "is_null"
     return label_dic
 
 
@@ -269,12 +270,6 @@ def main():
         out_file = open(str(
             './checkpoints/' + METHOD + '/' + 'result_param.json'), "w+")
         json.dump(result_param, out_file, indent=4)
-
-    plt.plot(range(1, Epoch + 1), result['training_loss'])
-    plt.title("loss value")
-    plt.ylabel("loss value")
-    plt.xlabel("epoch")
-    plt.show()
 
 
 if __name__ == "__main__":
