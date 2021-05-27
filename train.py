@@ -17,6 +17,7 @@ import torch.utils.data as data
 import json
 from torchvision.datasets import ImageFolder
 from pathlib import Path
+from xgboost import XGBClassifier
 
 ##### Efficient Net V1
 from efficientnet_pytorch import EfficientNet
@@ -148,7 +149,6 @@ def switchModel(in_features = 0):
         # model = globals()[METHOD](num_classes=num_classes)
     return model
 
-
 START_EPOCH = getFinalEpoch() + 1 if getFinalEpoch() is not None else 0
 
 def main():
@@ -191,9 +191,6 @@ def main():
         modelPath = getModelPath()
         if modelPath != "":
             model.load_state_dict(torch.load(modelPath))
-        else:
-            print("<load model error>Check whether your method and method_level setting is right. Or set load_model as False without try to load checkpoint model.")
-            exit(-1)
 
     # for resnet
     # model = ResNet18(in_features=in_features, num_classes=num_classes, pretrained=False)
