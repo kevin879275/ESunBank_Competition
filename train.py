@@ -103,18 +103,22 @@ def getFinalEpoch(): #return last epoch num (final training saved)
         return None
     files = [x for x in filter(lambda x:re.match(
         f'.*EPOCH_\d+.pkl', x), os.listdir(CHECKPOINT_FOLDER))]
-    if start_epoch == -1:
-        start_epoch = len(files)-1
-    if start_epoch > len(files)-1:
-        print(f"input start epoch {start_epoch} no exist model")
+    nums= [int(re.match(r'EPOCH_(\d+).pkl', x).group(1)) for x in files]
+    
+
+
+    if len(files)==0 :
+        if start_epoch != -1:
+            print(f"<Warning> No such a Start epoch checkpoint file #{start_epoch} exists, which is file {CHECKPOINT_FOLDER}EPOCH_{start_epoch}.pkl")
         return None
-    if start_epoch == -1:
-        start_epoch = 0
-    for file in files:
-        r = re.match(r'EPOCH_(\d+).pkl', file)
-        num = int(r.groups(1)[0])
-        if num == start_epoch:
-            return num
+
+    if start_epoch==-1:
+        return max(nums)
+    # search specific number 
+    if start_epoch in nums:
+        return start_epoch
+    else:
+        print(f"<Warning> No such a Start epoch checkpoint file #{start_epoch} exists, which is file {CHECKPOINT_FOLDER}EPOCH_{start_epoch}.pkl")
     return None
 
 
