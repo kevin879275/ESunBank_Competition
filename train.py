@@ -60,7 +60,7 @@ parser.add_argument("-ml", "--method_level", type=str, default="m")
 
 ### Load Model Settings ###
 # Load from epoch, -1 = final epoch in checkpoint
-parser.add_argument("-se", "--start_epoch", type=int, default=-1)
+parser.add_argument("-se", "--start_epoch", type=int, default=50)
 parser.add_argument("-L", "--load_model", type=str2bool,
                     default=False)  # Load model or train from 0
 
@@ -259,13 +259,16 @@ def main():
         running_valid_loss = 0
         running_valid_correct = 0
         model.train()
+        if prograssive is not None:
+            train_dataloader.resize=int(prograssive["imgsize"])
         train_bar = tqdm(train_dataloader)
         for imgs, label in train_bar:
             imgs = imgs.to(device)
             label = label.to(device)
             if prograssive is not None:
                 imgs, label = mixup(imgs, label, prograssive["mix"])
-                setDropout(model, prograssive["dropout"])
+                setDropout(model, prograssive["drop"])
+                
             optimizer.zero_grad()
             out = model(imgs)
             loss_val = loss(out, label)

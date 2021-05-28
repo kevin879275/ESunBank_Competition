@@ -84,12 +84,17 @@ def mixup(x, y, q=0., use_cuda=True):
     p = 1-q # random value [0,1-q)
     
     batch_size = x.size()[0]
-    if use_cuda:
+    if use_cuda: 
         index = torch.randperm(batch_size).cuda()
     else:
         index = torch.randperm(batch_size)
 
     mixed_x = p * x + q * x[index, :]
-    mixed_y = p * y + q * y[index, :] 
+    '''y : [1,3,5] size : [B] '''
+    if p>q:
+        mixed_y=y
+    else :
+        mixed_y=y[index]
+  
     return mixed_x, mixed_y
 
