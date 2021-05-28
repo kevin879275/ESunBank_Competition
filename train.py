@@ -18,7 +18,7 @@ import json
 from torchvision.datasets import ImageFolder
 from pathlib import Path
 import xgboost
-
+from utils import *
 ##### Efficient Net V1
 from efficientnet_pytorch import EfficientNet
 
@@ -72,8 +72,10 @@ path = './data'
 label_path = 'training data dic.txt'
 
 # Hyper Parameters
+PrograssiveModelDict=None
 if args.method == "efficientnet" or args.method == "efficientnetV2":
     METHOD = f"{args.method}-{args.method_level}"
+    PrograssiveModelDict = PrograssiveBounds[args.method][args.method_level]
 elif args.method == 'regnet':
     METHOD = args.method
 else:
@@ -248,6 +250,9 @@ def main():
                     'validation_loss': [], 'validation_accuracy': []}
 
     for epoch in range(START_EPOCH, Epoch):
+        prograssive = None
+        if PrograssiveModelDict is not None:
+            prograssive = prograssiveNow(epoch, Epoch,PrograssiveModelDict)
         since = time.time()
         running_training_loss = 0
         running_training_correct = 0
@@ -258,6 +263,9 @@ def main():
         for imgs, label in train_bar:
             imgs = imgs.to(device)
             label = label.to(device)
+            if prograssive is not None:
+                imgs, label = mixup(imgs, label, prograssive["mix"])
+                setDropout(model, prograssive["dropout"])
             optimizer.zero_grad()
             out = model(imgs)
             loss_val = loss(out, label)
