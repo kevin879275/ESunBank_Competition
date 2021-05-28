@@ -60,9 +60,9 @@ parser.add_argument("-ml", "--method_level", type=str, default="m")
 
 ### Load Model Settings ###
 # Load from epoch, -1 = final epoch in checkpoint
-parser.add_argument("-se", "--start_epoch", type=int, default=50)
+parser.add_argument("-se", "--start_epoch", type=int, default=-1)
 parser.add_argument("-L", "--load_model", type=str2bool,
-                    default=False)  # Load model or train from 0
+                    default=True)  # Load model or train from 0
 
 args = parser.parse_args()
 
