@@ -30,9 +30,8 @@ class ChineseHandWriteDataset(Dataset):
         self.resize = resize
         self.resize_size = resize_size
         self.label_dic = label_dic
-        for root, dirs, files in os.walk(self.root, topdown=False):
-            for name in files:
-                self.img_file.append(os.path.join(root, name))
+        for _, file in enumerate(os.listdir(root)):
+            self.img_file.append(root + '/' + file)
             
                
        
