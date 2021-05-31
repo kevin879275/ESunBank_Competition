@@ -36,7 +36,7 @@ class ChineseHandWriteDataset(Dataset):
             self.randaugment= augmentations.RandAugment()
 
         for _, file in enumerate(os.listdir(root)):
-            self.img_file.append(root + '/' + file)
+            self.img_file.append(f"{root}/{file}")
 
             
                

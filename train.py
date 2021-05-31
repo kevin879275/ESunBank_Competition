@@ -42,7 +42,7 @@ parser = argparse.ArgumentParser(
     description="ESun Competition HandWrite Recognition")
 parser.add_argument("-e", "--epochs", type=int, default=100)
 parser.add_argument("-b", "--batchsize", type=int, default=16)
-parser.add_argument("-l", "--learning_rate", type=float, default=0.0001)
+parser.add_argument("-l", "--learning_rate", type=float, default=0.001)
 parser.add_argument("-s", "--split_rate", type=float, default=0.8)
 parser.add_argument("-r", "--resize", type=int, default=True)
 parser.add_argument("-rs", "--resize_size", type=int, default=128)
@@ -60,9 +60,9 @@ parser.add_argument("-ml", "--method_level", type=str, default="s")
 
 ### Load Model Settings ###
 # Load from epoch, -1 = final epoch in checkpoint
-parser.add_argument("-se", "--start_epoch", type=int, default=0)
+parser.add_argument("-se", "--start_epoch", type=int, default=-1)
 parser.add_argument("-L", "--load_model", type=str2bool,
-                    default=False)  # Load model or train from 0
+                    default=True)  # Load model or train from 0
 
 args = parser.parse_args()
 
@@ -203,7 +203,7 @@ def main():
     train_dataset = []
     valid_dataset = []
     for idx, dir_ in enumerate(os.listdir(clean_image_path)):
-        dataset = ChineseHandWriteDataset(root=image_path, label_dic=label_dic, transform=transform, resize=resize,
+        dataset = ChineseHandWriteDataset(root=clean_image_path + dir_, label_dic=label_dic, transform=transform, resize=resize,
                                       resize_size=resize_size, randaug=args.method=="efficientnetV2")
 
         train_set_size = int(len(dataset) * split_rate)
@@ -264,7 +264,7 @@ def main():
         prograssive = None
         if PrograssiveModelDict is not None:
             progressive = prograssiveNow(epoch, Epoch,PrograssiveModelDict)
-            train_dataset.progressive=progressive
+            dataset.progressive=progressive
 
             
         since = time.time()
@@ -274,15 +274,15 @@ def main():
         running_valid_correct = 0
         dataset.train()
         model.train()
-        if prograssive is not None:
-            train_dataloader.resize=int(prograssive["imgsize"])
+        if progressive is not None:
+            train_dataloader.resize=int(progressive["imgsize"])
         train_bar = tqdm(train_dataloader)
         for imgs, label in train_bar:
             imgs = imgs.to(device)
             label = label.to(device)
-            if prograssive is not None:
-                imgs, label = mixup(imgs, label, prograssive["mix"])
-                setDropout(model, prograssive["drop"])
+            if progressive is not None:
+                imgs, label = mixup(imgs, label, progressive["mix"])
+                setDropout(model, progressive["drop"])
                 
             optimizer.zero_grad()
             out = model(imgs)
@@ -293,7 +293,8 @@ def main():
             loss_val.backward()
             optimizer.step()
             train_bar.set_description(desc='[%d/%d] | Train Loss:%.4f' %
-                                           (epoch + 1, Epoch, loss_val.item()))
+                                           (epoch + 1, Epoch, loss_val.item()/
+                                                 len(imgs)))
         with torch.no_grad():
             dataset.eval()
             model.eval()
@@ -303,7 +304,8 @@ def main():
                 label = label.to(device)
                 out = model(imgs)
                 loss_val = loss(out, label)
-                val_bar.set_description(desc='[%d/%d] | Validation Loss:%.4f' % (epoch + 1, Epoch, loss_val.item()))
+                val_bar.set_description(desc='[%d/%d] | Validation Loss:%.4f' % (epoch + 1, Epoch, loss_val.item()/
+                                                 len(imgs)))
                 _, pred_class = torch.max(out.data, 1)
                 running_valid_correct += torch.sum(pred_class == label)
                 running_valid_loss += loss_val

@@ -202,7 +202,7 @@ class MBConv(nn.Module):
         super(MBConv, self).__init__()
         assert stride in [1, 2]
 
-        hidden_dim = round(inp * expand_ratio)
+        hidden_dim = round(inp * expand_ratio) 
         self.dropouts = [nn.Dropout2d(),nn.Dropout2d()]
         self.identity = stride == 1 and inp == oup
         if use_se:
@@ -272,7 +272,7 @@ class EffNetV2(nn.Module):
         x = self.conv(x)
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
-        x = self.dropout(x)
+        #x = self.dropout(x)
         x = self.classifier(x)
         return x
 

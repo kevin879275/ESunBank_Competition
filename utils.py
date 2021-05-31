@@ -68,7 +68,7 @@ def prograssiveNow(epoch,num_epochs,boudDictofModel):
 
 def setDropout(model, drop_rate=0.1):
     for name, child in model.named_children():
-        if isinstance(child, torch.nn.Dropout):
+        if isinstance(child, torch.nn.Dropout2d):
             child.p = drop_rate
         setDropout(child, drop_rate=drop_rate)
 
