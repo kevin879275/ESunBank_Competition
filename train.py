@@ -164,7 +164,7 @@ def getWeights(root):
         label_num[str(i)] = None
     for idx, dir_ in enumerate(os.listdir(root)):
         nSamples = len(os.listdir(root + dir_))
-        label_num[dir_] = nSamples
+        label_num[dir_] = nSamples * split_rate
     sorted_label_num = sorted(label_num.items(), key=lambda item: item[1])
     median_idx = int(len(sorted_label_num) / 2)
     median = sorted_label_num[median_idx][1]
@@ -193,19 +193,31 @@ def main():
     ])
 
     clean_image_path = './train_image/'
-    clean_transform = transforms.Compose([
-        transforms.Grayscale(num_output_channels=1),
-        transforms.Resize((resize_size, resize_size)),
-        transforms.ToTensor(),
-    ])
-    # dataset = ImageFolder(clean_image_path,transform=clean_transform)
-    dataset = ChineseHandWriteDataset(root=image_path, label_dic=label_dic, transform=transform, resize=resize,
-                                      resize_size=resize_size, randaug=args.method=="efficientnetV2")
 
-    train_set_size = int(len(dataset) * split_rate)
-    valid_set_size = len(dataset) - train_set_size
-    train_dataset, valid_dataset = data.random_split(dataset, [train_set_size, valid_set_size],
-                                                     torch.Generator().manual_seed(args.seed))
+
+
+
+
+    # clean_transform = transforms.Compose([
+    #     transforms.Grayscale(num_output_channels=1),
+    #     transforms.Resize((resize_size, resize_size)),
+    #     transforms.ToTensor(),
+    # ])
+
+    train_dataset = []
+    valid_dataset = []
+    for idx, dir_ in enumerate(os.listdir(clean_image_path)):
+        dataset = ChineseHandWriteDataset(root=image_path, label_dic=label_dic, transform=transform, resize=resize,
+                                      resize_size=resize_size, randaug=args.method=="efficientnetV2")
+        train_set_size = int(len(dataset) * split_rate)
+        valid_set_size = len(dataset) - train_set_size
+        train_set, valid_set = data.random_split(dataset, [train_set_size, valid_set_size],
+                                                 torch.Generator().manual_seed(args.seed))
+        train_dataset.append(train_set)
+        valid_dataset.append(valid_set)
+
+    train_dataset = data.ConcatDataset(train_dataset)
+    valid_dataset = data.ConcatDataset(valid_dataset)
 
     train_dataloader = DataLoader(
         train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=args.num_workers)
@@ -214,7 +226,7 @@ def main():
         valid_dataset, batch_size=valid_batch_size, pin_memory=True, num_workers=args.num_workers)
 
     print(f"model is {METHOD}")
-    model = switchModel(in_features=dataset[0][0].shape[0])
+    model = switchModel(in_features=train_dataset[0][0].shape[0])
     if args.load_model:
         modelPath = getModelPath()
         if modelPath != "":
@@ -300,13 +312,13 @@ def main():
                 running_valid_loss += loss_val
 
         result_param['training_loss'].append(
-            running_training_loss.item() / train_set_size)
+            running_training_loss.item() / len(train_dataset) * BATCH_SIZE)
         result_param['training_accuracy'].append(running_training_correct.item() /
-                                                 train_set_size)
+                                                 len(train_dataset))
         result_param['validation_loss'].append(
-            running_valid_loss.item() / valid_set_size)
+            running_valid_loss.item() / len(valid_dataset) * valid_batch_size)
         result_param['validation_accuracy'].append(running_valid_correct.item() /
-                                                   valid_set_size)
+                                                   len(valid_dataset))
 
         print(
             "Epoch:{} Train Loss:{:.4f},  Train Accuracy:{:.4f},  Validation Loss:{:.4f},  Validation Accuracy:{:.4f}".format(

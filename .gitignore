@@ -139,3 +139,6 @@ training data dic.txt
 
 #configuration file
 *.json
+
+
+*.pkl

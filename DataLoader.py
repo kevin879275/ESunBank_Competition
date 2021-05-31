@@ -34,9 +34,10 @@ class ChineseHandWriteDataset(Dataset):
         self._eval=False
         if randaug:
             self.randaugment= augmentations.RandAugment()
-        for root, dirs, files in os.walk(self.root, topdown=False):
-            for name in files:
-                self.img_file.append(os.path.join(root, name))
+
+        for _, file in enumerate(os.listdir(root)):
+            self.img_file.append(root + '/' + file)
+
             
                
        
