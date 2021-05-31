@@ -194,10 +194,6 @@ def main():
 
     clean_image_path = './train_image/'
 
-
-
-
-
     # clean_transform = transforms.Compose([
     #     transforms.Grayscale(num_output_channels=1),
     #     transforms.Resize((resize_size, resize_size)),
@@ -209,6 +205,7 @@ def main():
     for idx, dir_ in enumerate(os.listdir(clean_image_path)):
         dataset = ChineseHandWriteDataset(root=image_path, label_dic=label_dic, transform=transform, resize=resize,
                                       resize_size=resize_size, randaug=args.method=="efficientnetV2")
+
         train_set_size = int(len(dataset) * split_rate)
         valid_set_size = len(dataset) - train_set_size
         train_set, valid_set = data.random_split(dataset, [train_set_size, valid_set_size],
