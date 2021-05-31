@@ -3,7 +3,7 @@ from PIL import Image
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
 import json
-
+import augmentations
 unsuitable_data = ['10412_家.jpg',
 '18683_邦.jpg',
 '21273_研.jpg',
@@ -22,7 +22,7 @@ unsuitable_data = ['10412_家.jpg',
 '62323_鈦.jpg',
 '66241_悅.jpg']
 class ChineseHandWriteDataset(Dataset):
-    def __init__(self, root="", label_dic={}, transform=None, resize=True, resize_size=128):
+    def __init__(self, root="", label_dic={}, transform=None, resize=True, resize_size=128 ,randaug=False):
         self.img_file = []
         self.labelfile = []
         self.transform = transform
@@ -30,6 +30,10 @@ class ChineseHandWriteDataset(Dataset):
         self.resize = resize
         self.resize_size = resize_size
         self.label_dic = label_dic
+        self.randaug=randaug
+        self._eval=False
+        if randaug:
+            self.randaugment= augmentations.RandAugment()
         for root, dirs, files in os.walk(self.root, topdown=False):
             for name in files:
                 self.img_file.append(os.path.join(root, name))
@@ -53,7 +57,14 @@ class ChineseHandWriteDataset(Dataset):
         #             label_path = dir_path + '/' + file
         #             self.labelfile.append(label_path)
         #             self.label = np.load(self.labelfile[0])
-
+    @property
+    def progressive(self):
+        return self.progressiveDict
+    @progressive.setter
+    def progressive(self,progressiveDict):
+        self.progressiveDict=progressiveDict
+        self.randaugment.n=progressiveDict["randarg"]
+    
     def __getitem__(self, index):
         img_path =  self.img_file[index]
         img = Image.open(img_path).convert('L')
@@ -64,8 +75,13 @@ class ChineseHandWriteDataset(Dataset):
             label = 800
         if self.resize:
             img = img.resize((self.resize_size, self.resize_size))
-
+        if not self._eval and self.randaug:
+            self.randaugment(img)
+        
         return self.transform(img), label
-
+    def eval(self):
+        self._eval=True
+    def train(self):
+        self._eval=False
     def __len__(self):
         return len(self.img_file)

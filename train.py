@@ -19,9 +19,9 @@ from torchvision.datasets import ImageFolder
 from pathlib import Path
 import xgboost
 from utils import *
+from torch_poly_lr_decay import PolynomialLRDecay
 ##### Efficient Net V1
 from efficientnet_pytorch import EfficientNet
-
 try:
     from tqdm import tqdm
 except ImportError:
@@ -41,12 +41,12 @@ def str2bool(v):
 parser = argparse.ArgumentParser(
     description="ESun Competition HandWrite Recognition")
 parser.add_argument("-e", "--epochs", type=int, default=100)
-parser.add_argument("-b", "--batchsize", type=int, default=32)
-parser.add_argument("-l", "--learning_rate", type=float, default=0.001)
+parser.add_argument("-b", "--batchsize", type=int, default=16)
+parser.add_argument("-l", "--learning_rate", type=float, default=0.0001)
 parser.add_argument("-s", "--split_rate", type=float, default=0.8)
 parser.add_argument("-r", "--resize", type=int, default=True)
 parser.add_argument("-rs", "--resize_size", type=int, default=128)
-parser.add_argument("-vb", "--validbatchsize", type=int, default=32)
+parser.add_argument("-vb", "--validbatchsize", type=int, default=16)
 parser.add_argument('--use_gpu', dest='use_gpu', type=str2bool, default=True, help='use gpu')
 parser.add_argument("-nw", "--num_workers", type=int, default=1)
 parser.add_argument("-sd", "--seed", type=int, default=1)  # spilt random Seed
@@ -55,14 +55,14 @@ parser.add_argument("-xgb", "--xgboost", type=str2bool, default=False) # use xgb
 # Method save name and load name
 parser.add_argument("-m", "--method", type=str, default="efficientnetV2")
 # Method level e.g. b0, b1, b2, b3 or S, M, L
-parser.add_argument("-ml", "--method_level", type=str, default="m")
+parser.add_argument("-ml", "--method_level", type=str, default="s")
 # final save name => method + method_level , e.g. efficientNetb0
 
 ### Load Model Settings ###
 # Load from epoch, -1 = final epoch in checkpoint
-parser.add_argument("-se", "--start_epoch", type=int, default=-1)
+parser.add_argument("-se", "--start_epoch", type=int, default=0)
 parser.add_argument("-L", "--load_model", type=str2bool,
-                    default=True)  # Load model or train from 0
+                    default=False)  # Load model or train from 0
 
 args = parser.parse_args()
 
@@ -75,7 +75,8 @@ label_path = 'training data dic.txt'
 PrograssiveModelDict=None
 if args.method == "efficientnet" or args.method == "efficientnetV2":
     METHOD = f"{args.method}-{args.method_level}"
-    PrograssiveModelDict = PrograssiveBounds[args.method][args.method_level]
+    if args.method == "efficientnetV2":
+        PrograssiveModelDict = PrograssiveBounds[args.method][args.method_level]
 elif args.method == 'regnet':
     METHOD = args.method
 else:
@@ -199,7 +200,7 @@ def main():
     ])
     # dataset = ImageFolder(clean_image_path,transform=clean_transform)
     dataset = ChineseHandWriteDataset(root=image_path, label_dic=label_dic, transform=transform, resize=resize,
-                                      resize_size=resize_size)
+                                      resize_size=resize_size, randaug=args.method=="efficientnetV2")
 
     train_set_size = int(len(dataset) * split_rate)
     valid_set_size = len(dataset) - train_set_size
@@ -243,21 +244,26 @@ def main():
     loss = FocalLoss(weight=weights).to(device)
 
     optimizer = optim.AdamW(model.parameters(), lr=lr)
-
+    scheduler_poly_lr_decay = PolynomialLRDecay(optimizer, max_decay_steps=100, end_learning_rate=lr, power=2.0)
     print("------------------ training start -----------------")
 
     result_param = {'training_loss': [], 'training_accuracy': [],
                     'validation_loss': [], 'validation_accuracy': []}
 
     for epoch in range(START_EPOCH, Epoch):
+        scheduler_poly_lr_decay.step()
         prograssive = None
         if PrograssiveModelDict is not None:
-            prograssive = prograssiveNow(epoch, Epoch,PrograssiveModelDict)
+            progressive = prograssiveNow(epoch, Epoch,PrograssiveModelDict)
+            train_dataset.progressive=progressive
+
+            
         since = time.time()
         running_training_loss = 0
         running_training_correct = 0
         running_valid_loss = 0
         running_valid_correct = 0
+        dataset.train()
         model.train()
         if prograssive is not None:
             train_dataloader.resize=int(prograssive["imgsize"])
@@ -280,6 +286,7 @@ def main():
             train_bar.set_description(desc='[%d/%d] | Train Loss:%.4f' %
                                            (epoch + 1, Epoch, loss_val.item()))
         with torch.no_grad():
+            dataset.eval()
             model.eval()
             val_bar = tqdm(valid_dataloader)
             for imgs, label in val_bar:
