@@ -4,6 +4,8 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 import json
 import augmentations
+import re
+from pathlib import Path
 unsuitable_data = ['10412_家.jpg',
 '18683_邦.jpg',
 '21273_研.jpg',
@@ -34,9 +36,9 @@ class ChineseHandWriteDataset(Dataset):
         self._eval=False
         if randaug:
             self.randaugment= augmentations.RandAugment()
-
-        for _, file in enumerate(os.listdir(root)):
-            self.img_file.append(f"{root}/{file}")
+        if Path(root).exists():
+            for _, file in enumerate(os.listdir(root)):
+                    self.img_file.append(f"{root}/{file}")
 
             
                
@@ -66,10 +68,12 @@ class ChineseHandWriteDataset(Dataset):
         self.progressiveDict=progressiveDict
         self.randaugment.n=progressiveDict["randarg"]
     
+    def getLabelFromPath(path):
+        return path[-5:-4]
     def __getitem__(self, index):
         img_path =  self.img_file[index]
         img = Image.open(img_path).convert('L')
-        label_chinese = img_path[-5:-4]
+        label_chinese = self.getLabelFromPath(img_path)
         if label_chinese in self.label_dic:
             label = self.label_dic[label_chinese]
         else:
@@ -86,3 +90,13 @@ class ChineseHandWriteDataset(Dataset):
         self._eval=False
     def __len__(self):
         return len(self.img_file)
+
+class CleanDataset(ChineseHandWriteDataset):
+
+    def getLabelFromPath(self,path):
+        
+        if re.search(r'/',path):
+            filename=path.split("/")[-1]
+        elif re.search(r'\\',path):
+            filename=path.split("\\")[-1]
+        return filename[0]
