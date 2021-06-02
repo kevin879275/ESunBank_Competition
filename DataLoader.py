@@ -68,7 +68,7 @@ class ChineseHandWriteDataset(Dataset):
         self.progressiveDict=progressiveDict
         self.randaugment.n=progressiveDict["randarg"]
     
-    def getLabelFromPath(path):
+    def getLabelFromPath(self,path):
         return path[-5:-4]
     def __getitem__(self, index):
         img_path =  self.img_file[index]

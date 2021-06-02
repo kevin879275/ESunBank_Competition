@@ -170,6 +170,8 @@ def main(args):
         with torch.no_grad():
             dataset.eval()
             model.eval()
+            if progressive is not None:
+                setDropout(model,0)
             val_bar = tqdm(valid_dataloader)
             for imgs, label in val_bar:
                 imgs = imgs.to(device)
