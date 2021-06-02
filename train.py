@@ -8,7 +8,7 @@ from torchsummary import summary
 from torch.utils.data import Dataset, DataLoader
 from model import *
 import torchvision.transforms as transforms
-from DataLoader import ChineseHandWriteDataset
+from DataLoader import ChineseHandWriteDataset, CleanDataset
 import time
 import matplotlib.pyplot as plt
 import argparse
@@ -71,7 +71,7 @@ def main(args):
     ])
 
     clean_image_path = './train_image/'
-
+    synthesis_path = './synthesis/'
     # clean_transform = transforms.Compose([
     #     transforms.Grayscale(num_output_channels=1),
     #     transforms.Resize((resize_size, resize_size)),
@@ -83,7 +83,8 @@ def main(args):
     for idx, dir_ in enumerate(os.listdir(clean_image_path)):
         dataset = ChineseHandWriteDataset(root=clean_image_path + dir_, label_dic=label_dic, transform=transform, resize=resize,
                                       resize_size=resize_size, randaug=args.method=="efficientnetV2")
-
+        # dataset = CleanDataset(root=synthesis_path + dir_, label_dic=label_dic, transform=transform, resize=resize,
+        #                               resize_size=resize_size, randaug=args.method=="efficientnetV2")
         train_set_size = int(len(dataset) * split_rate)
         valid_set_size = len(dataset) - train_set_size
         train_set, valid_set = data.random_split(dataset, [train_set_size, valid_set_size],
@@ -273,7 +274,7 @@ if __name__ == "__main__":
     # Method save name and load name
     parser.add_argument("-m", "--method", type=str, default="efficientnetV2")
     # Method level e.g. b0, b1, b2, b3 or S, M, L
-    parser.add_argument("-ml", "--method_level", type=str, default="l")
+    parser.add_argument("-ml", "--method_level", type=str, default="s")
     # final save name => method + method_level , e.g. efficientNetb0
 
     ### Load Model Settings ###
