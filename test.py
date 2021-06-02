@@ -55,14 +55,14 @@ parser.add_argument("-sd", "--seed", type=int, default=1)  # spilt random Seed
 # Method save name and load name
 parser.add_argument("-m", "--method", type=str, default="efficientnetV2")
 # Method level e.g. b0, b1, b2, b3 or S, M, L
-parser.add_argument("-ml", "--method_level", type=str, default="m")
+parser.add_argument("-ml", "--method_level", type=str, default="s")
 # final save name => method + method_level , e.g. efficientNetb0
 
 ### Load Model Settings ###
 # Load from epoch, -1 = final epoch in checkpoint
 parser.add_argument("-se", "--start_epoch", type=int, default=-1)
 parser.add_argument("-L", "--load_model", type=str2bool,
-                    default=False)  # Load model or train from 0
+                    default=True)  # Load model or train from 0
 
 args = parser.parse_args()
 
@@ -121,26 +121,6 @@ def getFinalEpoch():  # return last epoch num (final training saved)
     return None
 
 
-'''Argumentation'''
-
-def mixup(x, y, alpha=1.0, use_cuda=args.use_gpu):
-
-    '''Compute the mixup data. Return mixed inputs, pairs of targets, and lambda'''
-    if alpha > 0.:
-        lam = np.random.beta(alpha, alpha)
-    else:
-        lam = 1.
-    batch_size = x.size()[0]
-    if use_cuda:
-        index = torch.randperm(batch_size).cuda()
-    else:
-        index = torch.randperm(batch_size)
-
-    mixed_x = lam * x + (1 - lam) * x[index,:]
-
-    mixed_y = lam * y + (1 - lam) * y[index]
-    return mixed_x, mixed_y
-
 def getModelPath():
     num = getFinalEpoch()
     if num is not None:
@@ -188,9 +168,11 @@ def main():
         transforms.ToTensor(),
     ])
     #dataset = ImageFolder(clean_image_path, transform=clean_transform)
-    dataset = ChineseHandWriteDataset(root=image_path, label_dic=label_dic, transform=transform, resize=resize,
-                                      resize_size=resize_size)
-
+    dataset = []
+    for idx, dir_ in enumerate(os.listdir(clean_image_path)):
+        dataset.append(ChineseHandWriteDataset(root=clean_image_path + dir_, label_dic=label_dic, transform=transform, resize=resize,
+                                        resize_size=resize_size))
+    dataset=data.ConcatDataset(dataset)
     test_dataloader = DataLoader(
         dataset, batch_size=1, pin_memory=True, num_workers=args.num_workers)
 

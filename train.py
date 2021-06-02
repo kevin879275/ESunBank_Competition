@@ -1,5 +1,4 @@
 import os
-import re
 import numpy as np
 import torch
 import torch.nn as nn
@@ -16,177 +15,56 @@ import argparse
 import torch.utils.data as data
 import json
 from torchvision.datasets import ImageFolder
-from pathlib import Path
 import xgboost
 from utils import *
 from torch_poly_lr_decay import PolynomialLRDecay
-##### Efficient Net V1
-from efficientnet_pytorch import EfficientNet
-try:
-    from tqdm import tqdm
-except ImportError:
-    print('tqdm could not be imported. If you want to use progress bar during training,'
-          'install tqdm from https://github.com/tqdm/tqdm.')
+from tqdm import tqdm
+from pathlib import Path
 
 
-def str2bool(v):
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
+def main(args):
+    
+    # file path
+    image_path = './train_image'
+    path = './data'
+    label_path = 'training data dic.txt'
+
+
+    # Hyper Parameters
+    PrograssiveModelDict=None
+    if args.method == "efficientnet" or args.method == "efficientnetV2":
+        METHOD = f"{args.method}-{args.method_level}"
+        if args.method == "efficientnetV2":
+            PrograssiveModelDict = PrograssiveBounds[args.method][args.method_level]
+    elif args.method == 'regnet':
+        METHOD = args.method
     else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
+        METHOD = args.method + args.method_level
 
-
-parser = argparse.ArgumentParser(
-    description="ESun Competition HandWrite Recognition")
-parser.add_argument("-e", "--epochs", type=int, default=100)
-parser.add_argument("-b", "--batchsize", type=int, default=16)
-parser.add_argument("-l", "--learning_rate", type=float, default=0.001)
-parser.add_argument("-s", "--split_rate", type=float, default=0.8)
-parser.add_argument("-r", "--resize", type=int, default=True)
-parser.add_argument("-rs", "--resize_size", type=int, default=128)
-parser.add_argument("-vb", "--validbatchsize", type=int, default=16)
-parser.add_argument('--use_gpu', dest='use_gpu', type=str2bool, default=True, help='use gpu')
-parser.add_argument("-nw", "--num_workers", type=int, default=1)
-parser.add_argument("-sd", "--seed", type=int, default=1)  # spilt random Seed
-parser.add_argument("-xgb", "--xgboost", type=str2bool, default=False) # use xgboost or not
-### Checkpoint Path / Select Method ###
-# Method save name and load name
-parser.add_argument("-m", "--method", type=str, default="efficientnetV2")
-# Method level e.g. b0, b1, b2, b3 or S, M, L
-parser.add_argument("-ml", "--method_level", type=str, default="s")
-# final save name => method + method_level , e.g. efficientNetb0
-
-### Load Model Settings ###
-# Load from epoch, -1 = final epoch in checkpoint
-parser.add_argument("-se", "--start_epoch", type=int, default=-1)
-parser.add_argument("-L", "--load_model", type=str2bool,
-                    default=True)  # Load model or train from 0
-
-args = parser.parse_args()
-
-# file path
-image_path = './train_image'
-path = './data'
-label_path = 'training data dic.txt'
-
-# Hyper Parameters
-PrograssiveModelDict=None
-if args.method == "efficientnet" or args.method == "efficientnetV2":
-    METHOD = f"{args.method}-{args.method_level}"
-    if args.method == "efficientnetV2":
-        PrograssiveModelDict = PrograssiveBounds[args.method][args.method_level]
-elif args.method == 'regnet':
-    METHOD = args.method
-else:
-    METHOD = args.method + args.method_level
-Epoch = args.epochs
-BATCH_SIZE = args.batchsize
-lr = args.learning_rate
-split_rate = args.split_rate
-resize = args.resize
-resize_size = args.resize_size
-num_classes = 801
-valid_batch_size = args.validbatchsize
-START_EPOCH = 0
-CHECKPOINT_FOLDER = './checkpoints/' + METHOD + '/'
-is_useweight = True
-# Environment
-if args.use_gpu and torch.cuda.is_available():
-    device = torch.device('cuda')
-    torch.backends.cudnn.benchmark = True
-else:
-    device = torch.device('cpu')
-    print('Warning! Using CPU.')
-
-
-def getFinalEpoch():  # return last epoch num (final training saved)
-
-    start_epoch = args.start_epoch
-    p = Path(CHECKPOINT_FOLDER)
-    if not p.exists():
-        return None
-    files = [x for x in filter(lambda x: re.match(
-        f'.*EPOCH_\d+.pkl', x), os.listdir(CHECKPOINT_FOLDER))]
-    nums = [int(re.match(r'EPOCH_(\d+).pkl', x).group(1)) for x in files]
-
-    if len(files) == 0:
-        if start_epoch != -1:
-            print(
-                f"<Warning> No such a Start epoch checkpoint file #{start_epoch} exists, which is file {CHECKPOINT_FOLDER}EPOCH_{start_epoch}.pkl")
-        return None
-
-    if start_epoch == -1:
-        return max(nums)
-    # search specific number
-    if start_epoch in nums:
-        return start_epoch
+    # Environment
+    if args.use_gpu and torch.cuda.is_available():
+        device = torch.device('cuda')
+        torch.backends.cudnn.benchmark = True
     else:
-        print(
-            f"<Warning> No such a Start epoch checkpoint file #{start_epoch} exists, which is file {CHECKPOINT_FOLDER}EPOCH_{start_epoch}.pkl")
-    return None
+        device = torch.device('cpu')
+        print('Warning! Using CPU.')
 
+    Epoch = args.epochs
+    BATCH_SIZE = args.batchsize
+    lr = args.learning_rate
+    split_rate = args.split_rate
+    resize = args.resize
+    resize_size = args.resize_size
+    num_classes = 801
+    valid_batch_size = args.validbatchsize
+    CHECKPOINT_FOLDER = args.checkpoint_root + METHOD + '/'
+    START_EPOCH = getFinalEpoch(args=args,CHECKPOINT_FOLDER=CHECKPOINT_FOLDER) + 1 if getFinalEpoch(args=args,CHECKPOINT_FOLDER=CHECKPOINT_FOLDER) is not None else 0
 
-def getModelPath():
-    num = getFinalEpoch()
-    if num is not None:
-        return f"{CHECKPOINT_FOLDER}EPOCH_{num}.pkl"
-    return ""
-
-
-def load_label_dic(label_path):
-    label_dic = {}
-    f = open(label_path, 'r', encoding="utf-8")
-    for idx, line in enumerate(f.readlines()):
-        label_dic[line[0]] = idx
-    label_dic[800] = "isnull"
-    return label_dic
-
-
-def switchModel(in_features=0):
-    if args.method == "efficientnet":
-        model = EfficientNet.from_pretrained(
-            METHOD, in_channels=1, num_classes=num_classes)
-    elif METHOD == "regnet":
-        model = RegNetx(in_features, num_classes,
-                        model='regnety_002', pretrained=True)
-    elif re.match(r'efficientnetV2', METHOD):
-        model = efficientnetV2[args.method_level]()
-        #
-        # model = globals()[METHOD](num_classes=num_classes)
-    return model
-
-
-def getWeights(root):
-    label_num = {}
-    for i in range(801):
-        label_num[str(i)] = None
-    for idx, dir_ in enumerate(os.listdir(root)):
-        nSamples = len(os.listdir(root + dir_))
-        label_num[dir_] = nSamples * split_rate
-    sorted_label_num = sorted(label_num.items(), key=lambda item: item[1])
-    median_idx = int(len(sorted_label_num) / 2)
-    median = sorted_label_num[median_idx][1]
-    weights = []
-    for i in label_num:
-        weight = median / label_num[str(i)]
-        weights.append(weight)
-    weights = torch.FloatTensor(weights)
-    return weights
-
-
-START_EPOCH = getFinalEpoch() + 1 if getFinalEpoch() is not None else 0
-
-
-def main():
+    is_useweight = True
     print("init data folder")
 
-    if not os.path.exists(str('./checkpoints')):
-        os.mkdir('checkpoints')
-    if not os.path.exists(str('./checkpoints/' + METHOD)):
-        os.mkdir('./checkpoints/' + METHOD)
-
+    Path(CHECKPOINT_FOLDER).mkdir(exist_ok=True,parents=True)
+    
     label_dic = load_label_dic(label_path)
     transform = transforms.Compose([
         transforms.ToTensor(),
@@ -223,28 +101,21 @@ def main():
         valid_dataset, batch_size=valid_batch_size, pin_memory=True, num_workers=args.num_workers)
 
     print(f"model is {METHOD}")
-    model = switchModel(in_features=train_dataset[0][0].shape[0])
+    model = switchModel(in_features=train_dataset[0][0].shape[0],num_classes=num_classes,args=args,METHOD=METHOD)
     if args.load_model:
-        modelPath = getModelPath()
+        modelPath = getModelPath(CHECKPOINT_FOLDER=CHECKPOINT_FOLDER,args=args)
         if modelPath != "":
             model.load_state_dict(torch.load(modelPath))
 
-    # for resnet
-    # model = ResNet18(in_features=in_features, num_classes=num_classes, pretrained=False)
-    # for regnet
 
-    # Efficient Net V1 B0
-    # model = EfficientNet.from_pretrained("efficientnet-b0",in_channels=1,num_classes=801)
 
     model.to(device)
-    # in_features = dataset[0][0].shape[1]*dataset[0][0].shape[2]
-    # model = Model(in_features=in_features).to(device)
-    # summary(model, (1, resize_size, resize_size))
+
 
     # get each class weight
     weights = None
     if is_useweight:
-        weights = getWeights(root=clean_image_path)
+        weights = getWeights(root=clean_image_path,split_rate=split_rate)
 
     # Label smoothing
     # loss = SmoothCrossEntropyLoss(weight=weights).to(device)
@@ -385,4 +256,30 @@ def main():
             xgbmodel.save_model('xgboost.model')
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+    description="ESun Competition HandWrite Recognition")
+    parser.add_argument("-e", "--epochs", type=int, default=100)
+    parser.add_argument("-b", "--batchsize", type=int, default=16)
+    parser.add_argument("-l", "--learning_rate", type=float, default=0.0001)
+    parser.add_argument("-s", "--split_rate", type=float, default=0.8)
+    parser.add_argument("-r", "--resize", type=int, default=True)
+    parser.add_argument("-rs", "--resize_size", type=int, default=128)
+    parser.add_argument("-vb", "--validbatchsize", type=int, default=16)
+    parser.add_argument('--use_gpu', dest='use_gpu', type=str2bool, default=True, help='use gpu')
+    parser.add_argument("-nw", "--num_workers", type=int, default=1)
+    parser.add_argument("-sd", "--seed", type=int, default=1)  # spilt random Seed
+    parser.add_argument("-xgb", "--xgboost", type=str2bool, default=False) # use xgboost or not
+    ### Checkpoint Path / Select Method ###
+    # Method save name and load name
+    parser.add_argument("-m", "--method", type=str, default="efficientnetV2")
+    # Method level e.g. b0, b1, b2, b3 or S, M, L
+    parser.add_argument("-ml", "--method_level", type=str, default="l")
+    # final save name => method + method_level , e.g. efficientNetb0
+
+    ### Load Model Settings ###
+    # Load from epoch, -1 = final epoch in checkpoint
+    parser.add_argument("-se", "--start_epoch", type=int, default=-1)
+    parser.add_argument("-L", "--load_model", type=str2bool,
+                    default=True)  # Load model or train from 0
+    parser.add_argument("-cr","--checkpoint_root",type=str,default="./checkpoints/")
+    main(parser.parse_args())

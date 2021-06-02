@@ -1,6 +1,16 @@
 import numpy as np
 import torch
 import random
+
+from pathlib import Path
+from efficientnet_pytorch import EfficientNet
+import os
+import re
+
+import torch
+
+
+from model import *
 '''Argumentation'''
 
 PrograssiveBounds={
@@ -57,6 +67,82 @@ PrograssiveBounds={
 
 
 
+
+from torchvision.datasets import ImageFolder
+def getFinalEpoch(args,CHECKPOINT_FOLDER):  # return last epoch num (final training saved)
+
+    start_epoch = args.start_epoch
+    p = Path(CHECKPOINT_FOLDER)
+    if not p.exists():
+        return None
+    files = [x for x in filter(lambda x: re.match(
+        f'.*EPOCH_\d+.pkl', x), os.listdir(CHECKPOINT_FOLDER))]
+    nums = [int(re.match(r'EPOCH_(\d+).pkl', x).group(1)) for x in files]
+
+    if len(files) == 0:
+        if start_epoch != -1:
+            print(
+                f"<Warning> No such a Start epoch checkpoint file #{start_epoch} exists, which is file {CHECKPOINT_FOLDER}EPOCH_{start_epoch}.pkl")
+        return None
+
+    if start_epoch == -1:
+        return max(nums)
+    # search specific number
+    if start_epoch in nums:
+        return start_epoch
+    else:
+        print(
+            f"<Warning> No such a Start epoch checkpoint file #{start_epoch} exists, which is file {CHECKPOINT_FOLDER}EPOCH_{start_epoch}.pkl")
+    return None
+
+
+def getModelPath(CHECKPOINT_FOLDER,args):
+    num = getFinalEpoch(CHECKPOINT_FOLDER=CHECKPOINT_FOLDER,args=args)
+    if num is not None:
+        return f"{CHECKPOINT_FOLDER}EPOCH_{num}.pkl"
+    return ""
+
+
+def load_label_dic(label_path):
+    label_dic = {}
+    f = open(label_path, 'r', encoding="utf-8")
+    for idx, line in enumerate(f.readlines()):
+        label_dic[line[0]] = idx
+    label_dic[800] = "isnull"
+    return label_dic
+
+
+def switchModel(in_features,num_classes,args,METHOD):
+    if args.method == "efficientnet":
+        model = EfficientNet.from_pretrained(
+            METHOD, in_channels=1, num_classes=num_classes)
+    elif METHOD == "regnet":
+        model = RegNetx(in_features, num_classes,
+                        model='regnety_002', pretrained=True)
+    elif re.match(r'efficientnetV2', METHOD):
+        model = efficientnetV2[args.method_level]()
+
+    return model
+
+
+def getWeights(root,split_rate):
+    label_num = {}
+    for i in range(801):
+        label_num[str(i)] = None
+    for idx, dir_ in enumerate(os.listdir(root)):
+        nSamples = len(os.listdir(root + dir_))
+        label_num[dir_] = nSamples * split_rate
+    sorted_label_num = sorted(label_num.items(), key=lambda item: item[1])
+    median_idx = int(len(sorted_label_num) / 2)
+    median = sorted_label_num[median_idx][1]
+    weights = []
+    for i in label_num:
+        weight = median / label_num[str(i)]
+        weights.append(weight)
+    weights = torch.FloatTensor(weights)
+    return weights
+
+
 def prograssiveNow(epoch,num_epochs,boudDictofModel):
     pa = epoch/(num_epochs -1)
     args = ["mix","drop","randarg","imgsize"]
@@ -98,3 +184,10 @@ def mixup(x, y, q=0., use_cuda=True):
   
     return mixed_x, mixed_y
 
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
