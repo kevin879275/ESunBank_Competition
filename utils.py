@@ -78,7 +78,8 @@ def getFinalEpoch(args,CHECKPOINT_FOLDER):  # return last epoch num (final train
     files = [x for x in filter(lambda x: re.match(
         f'.*EPOCH_\d+.pkl', x), os.listdir(CHECKPOINT_FOLDER))]
     nums = [int(re.match(r'EPOCH_(\d+).pkl', x).group(1)) for x in files]
-
+    if not args.load_model: 
+        return None
     if len(files) == 0:
         if start_epoch != -1:
             print(
@@ -110,6 +111,15 @@ def load_label_dic(label_path):
         label_dic[line[0]] = idx
     label_dic[800] = "isnull"
     return label_dic
+
+def load_word_dic(label_path):
+    label_dic = {}
+    f = open(label_path, 'r', encoding="utf-8")
+    for idx, line in enumerate(f.readlines()):
+        label_dic[idx] = line[0]
+    label_dic[800] = "isnull"
+    return label_dic
+
 
 
 def switchModel(in_features,num_classes,args,METHOD):

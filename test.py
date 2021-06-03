@@ -1,4 +1,5 @@
 import os
+import shutil
 import numpy as np
 import torch
 import torch.nn as nn
@@ -20,7 +21,7 @@ from utils import *
 from torch_poly_lr_decay import PolynomialLRDecay
 from tqdm import tqdm
 from pathlib import Path
-
+from shutil import copyfile
 
 def main(args):
     
@@ -66,6 +67,7 @@ def main(args):
     Path(CHECKPOINT_FOLDER).mkdir(exist_ok=True,parents=True)
     
     label_dic = load_label_dic(label_path)
+    word_dic = load_word_dic(label_path)
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
@@ -101,7 +103,6 @@ def main(args):
             model.load_state_dict(torch.load(modelPath))
 
 
-
     model.to(device)
 
 
@@ -126,13 +127,15 @@ def main(args):
     since = time.time()
     running_valid_loss = 0
     running_valid_correct = 0
-
+    wrong_output = f"./testwrong/{METHOD}/"
+    Path(wrong_output).mkdir(exist_ok=True,parents=True)
     with torch.no_grad():
         dataset.eval()
         model.eval()
         val_bar = tqdm(dataloader)
-        for imgs, label in val_bar:
-        
+        for imgs, label, folder, filename in val_bar:
+            
+            
             imgs = imgs.to(device)
             label = label.to(device)
             out = model(imgs)
@@ -141,6 +144,13 @@ def main(args):
                                             len(imgs)))
             _, pred_class = torch.max(out.data, 1)
             running_valid_correct += torch.sum(pred_class == label)
+            for i in range(len(imgs)):
+                if pred_class[i]!=label[i]:
+                    fromp=f"{folder[i]}{filename[i]}"
+                    outp=f"{wrong_output}p{word_dic[pred_class[i].item()]}_l{filename[i]}"
+                    copyfile(fromp,outp)
+
+
             running_valid_loss += loss_val
 
 

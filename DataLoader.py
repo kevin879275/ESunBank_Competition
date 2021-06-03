@@ -82,8 +82,7 @@ class ChineseHandWriteDataset(Dataset):
             img = img.resize((self.resize_size, self.resize_size))
         if not self._eval and self.randaug:
             self.randaugment(img)
-        
-        return self.transform(img), label
+        return self.transform(img), label, "/".join(img_path.split("/")[:-1]),img_path.split("/")[-1]
     def eval(self):
         self._eval=True
     def train(self):
