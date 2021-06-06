@@ -101,7 +101,7 @@ def main(args):
         train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=args.num_workers)
 
     valid_dataloader = DataLoader(
-        valid_dataset, batch_size=valid_batch_size, pin_memory=True, num_workers=args.num_workers)
+        valid_dataset, batch_size=valid_batch_size, pin_memory=False, num_workers=args.num_workers)
 
     print(f"model is {METHOD}")
     model = switchModel(in_features=train_dataset[0][0].shape[0],num_classes=num_classes,args=args,METHOD=METHOD)
@@ -175,7 +175,7 @@ def main(args):
             if progressive is not None:
                 setDropout(model,0)
             val_bar = tqdm(valid_dataloader)
-            for imgs, label in val_bar:
+            for imgs, label , folder, filename in val_bar:
                 imgs = imgs.to(device)
                 label = label.to(device)
                 out = model(imgs)
@@ -264,12 +264,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
     description="ESun Competition HandWrite Recognition")
     parser.add_argument("-e", "--epochs", type=int, default=100)
-    parser.add_argument("-b", "--batchsize", type=int, default=16)
+    parser.add_argument("-b", "--batchsize", type=int, default=32)
     parser.add_argument("-l", "--learning_rate", type=float, default=0.001)
     parser.add_argument("-s", "--split_rate", type=float, default=0.8)
     parser.add_argument("-r", "--resize", type=int, default=True)
     parser.add_argument("-rs", "--resize_size", type=int, default=128)
-    parser.add_argument("-vb", "--validbatchsize", type=int, default=16)
+    parser.add_argument("-vb", "--validbatchsize", type=int, default=4)
     parser.add_argument('--use_gpu', dest='use_gpu', type=str2bool, default=True, help='use gpu')
     parser.add_argument("-nw", "--num_workers", type=int, default=1)
     parser.add_argument("-sd", "--seed", type=int, default=1)  # spilt random Seed
