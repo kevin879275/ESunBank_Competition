@@ -249,7 +249,7 @@ class EffNetV2(nn.Module):
 
         # building first layer
         input_channel = _make_divisible(24 * width_mult, 8)
-        layers = [conv_3x3_bn(1, input_channel, 2)]
+        layers = [conv_3x3_bn(3, input_channel, 2)]
         # building inverted residual blocks
         block = MBConv
         for t, c, n, s, use_se in self.cfgs:

@@ -2,8 +2,10 @@ import os
 import shutil
 import numpy as np
 import torch
+import torch.nn.functional as F
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data.dataset import ConcatDataset
 import torchvision.models
 from torchsummary import summary
 from torch.utils.data import Dataset, DataLoader
@@ -21,7 +23,7 @@ from utils import *
 from torch_poly_lr_decay import PolynomialLRDecay
 from tqdm import tqdm
 from pathlib import Path
-from shutil import copyfile
+from shutil import move
 
 def main(args):
     
@@ -74,20 +76,23 @@ def main(args):
 
     clean_image_path = './train_image/'
     synthesis_path = './synthesis/'
-    test_dataset="./EsunTestData/"
+    test_dataset="./322/"
     # clean_transform = transforms.Compose([
     #     transforms.Grayscale(num_output_channels=1),
     #     transforms.Resize((resize_size, resize_size)),
     #     transforms.ToTensor(),
     # ])
 
+    
 
-
-    dataset = ChineseHandWriteDataset(root=test_dataset, label_dic=label_dic, transform=transform, resize=resize,
-                                resize_size=resize_size, randaug=args.method=="efficientnetV2")
-    # dataset = CleanDataset(root=synthesis_path + dir_, label_dic=label_dic, transform=transform, resize=resize,
-    #                               resize_size=resize_size, randaug=args.method=="efficientnetV2")
-
+    # dataset = ChineseHandWriteDataset(root=test_dataset, label_dic=label_dic, transform=transform, resize=resize,
+    #                             resize_size=resize_size, randaug=args.method=="efficientnetV2")
+    datasett=[]
+    for idx, dir_ in enumerate(os.listdir(clean_image_path)):
+        dataset = ChineseHandWriteDataset(root=clean_image_path + dir_, label_dic=label_dic, transform=transform, resize=resize,
+                                  resize_size=resize_size, randaug=args.method=="efficientnetV2")
+        datasett.append(dataset)
+    dataset= ConcatDataset(datasett)
 
 
     dataloader = DataLoader(
@@ -130,7 +135,6 @@ def main(args):
     wrong_output = f"./testwrong/{METHOD}/"
     Path(wrong_output).mkdir(exist_ok=True,parents=True)
     with torch.no_grad():
-        dataset.eval()
         model.eval()
         val_bar = tqdm(dataloader)
         for imgs, label, folder, filename in val_bar:
@@ -144,12 +148,28 @@ def main(args):
                                             len(imgs)))
             _, pred_class = torch.max(out.data, 1)
             running_valid_correct += torch.sum(pred_class == label)
+            out=F.softmax(out,dim=1)
             for i in range(len(imgs)):
                 if pred_class[i]!=label[i]:
+                    
+                    pred_classes=torch.topk(out.data, 5,1)
                     fromp=f"{folder[i]}{filename[i]}"
-                    outp=f"{wrong_output}p{word_dic[pred_class[i].item()]}_l{filename[i]}"
-                    copyfile(fromp,outp)
-
+                    pcs=[]
+                    for j in range(pred_classes.indices[i].size()[0]):
+                        pre=word_dic[pred_classes.indices[i][j].item()]
+                        pro=pred_classes.values[i][j].item()
+                        pcs.append(pre)
+                        pcs.append(str(round(pro,3)))
+                    
+                    
+                    pcs=",".join(pcs)
+                    num = folder[i].split("/")[-1]
+                    outF=f"{wrong_output}{num}/"
+                    Path(outF).mkdir(parents=True,exist_ok=True)
+                    outp=f"{outF}p{pcs}_l{filename[i]}"
+                    torchvision.utils.save_image(imgs[i],outp)
+                    
+                    move(f"{folder[i]}/{filename[i]}",f"{outF}{filename[i]}")
 
             running_valid_loss += loss_val
 

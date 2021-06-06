@@ -66,11 +66,12 @@ def main(args):
     Path(CHECKPOINT_FOLDER).mkdir(exist_ok=True,parents=True)
     
     label_dic = load_label_dic(label_path)
+    word_dic = load_word_dic(label_path)
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
 
-    clean_image_path = './train_image/'
+    clean_image_path = './color_dataset/'
     synthesis_path = './synthesis/'
     # clean_transform = transforms.Compose([
     #     transforms.Grayscale(num_output_channels=1),
@@ -81,10 +82,11 @@ def main(args):
     train_dataset = []
     valid_dataset = []
     for idx, dir_ in enumerate(os.listdir(clean_image_path)):
+        # if args.pretrain_cleandataset:
         dataset = ChineseHandWriteDataset(root=clean_image_path + dir_, label_dic=label_dic, transform=transform, resize=resize,
-                                      resize_size=resize_size, randaug=args.method=="efficientnetV2")
-        # dataset = CleanDataset(root=synthesis_path + dir_, label_dic=label_dic, transform=transform, resize=resize,
-        #                               resize_size=resize_size, randaug=args.method=="efficientnetV2")
+                                    resize_size=resize_size, randaug=args.method=="efficientnetV2")
+            # dataset = CleanDataset(root=synthesis_path + dir_, label_dic=label_dic, transform=transform, resize=resize,
+            #                             resize_size=resize_size, randaug=args.method=="efficientnetV2")
         train_set_size = int(len(dataset) * split_rate)
         valid_set_size = len(dataset) - train_set_size
         train_set, valid_set = data.random_split(dataset, [train_set_size, valid_set_size],
@@ -149,7 +151,7 @@ def main(args):
         if progressive is not None:
             train_dataloader.resize=int(progressive["imgsize"])
         train_bar = tqdm(train_dataloader)
-        for imgs, label in train_bar:
+        for imgs, label, folder, filename in train_bar:
             imgs = imgs.to(device)
             label = label.to(device)
             if progressive is not None:
@@ -263,7 +265,7 @@ if __name__ == "__main__":
     description="ESun Competition HandWrite Recognition")
     parser.add_argument("-e", "--epochs", type=int, default=100)
     parser.add_argument("-b", "--batchsize", type=int, default=16)
-    parser.add_argument("-l", "--learning_rate", type=float, default=0.0001)
+    parser.add_argument("-l", "--learning_rate", type=float, default=0.001)
     parser.add_argument("-s", "--split_rate", type=float, default=0.8)
     parser.add_argument("-r", "--resize", type=int, default=True)
     parser.add_argument("-rs", "--resize_size", type=int, default=128)
@@ -276,7 +278,7 @@ if __name__ == "__main__":
     # Method save name and load name
     parser.add_argument("-m", "--method", type=str, default="efficientnetV2")
     # Method level e.g. b0, b1, b2, b3 or S, M, L
-    parser.add_argument("-ml", "--method_level", type=str, default="s")
+    parser.add_argument("-ml", "--method_level", type=str, default="m")
     # final save name => method + method_level , e.g. efficientNetb0
 
     ### Load Model Settings ###
@@ -285,4 +287,5 @@ if __name__ == "__main__":
     parser.add_argument("-L", "--load_model", type=str2bool,
                     default=True)  # Load model or train from 0
     parser.add_argument("-cr","--checkpoint_root",type=str,default="./checkpoints/")
+    parser.add_argument("-data","--dataset",type=str,default="")
     main(parser.parse_args())
