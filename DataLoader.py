@@ -73,6 +73,7 @@ class ChineseHandWriteDataset(Dataset):
     def __getitem__(self, index):
         img_path =  self.img_file[index]
         img = Image.open(img_path)
+        img = img.convert('L')
         label_chinese = self.getLabelFromPath(img_path)
         if label_chinese in self.label_dic:
             label = self.label_dic[label_chinese]
