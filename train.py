@@ -169,7 +169,7 @@ def main(args):
                 for i in range(imgst.size()[0]):
                     imgs[i]=transform(randaugment(toPIL(imgst[i])))
                 imgs=imgs.to(device)
-                torchvision.utils.save_image(imgs,f"preprocessImgs/{epoch}-{batchI}.jpg")
+                # torchvision.utils.save_image(imgs,f"preprocessImgs/{epoch}-{batchI}.jpg")
                 setDropout(model, progressive["drop"])
                 
             optimizer.zero_grad()
