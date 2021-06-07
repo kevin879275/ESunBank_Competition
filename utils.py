@@ -24,8 +24,8 @@ PrograssiveBounds={
             "dropM":0.3,
             "randargm":5,
             "randargM":15,
-            "imgsizem":128,
-            "imgsizeM":300
+            "imgsizem":67,
+            "imgsizeM":250
         },
         "m":
         {
@@ -35,8 +35,8 @@ PrograssiveBounds={
             "dropM":0.4,
             "randargm":5,
             "randargM":20,
-            "imgsizem":128,
-            "imgsizeM":300
+            "imgsizem":67,
+            "imgsizeM":250
         },
         "l":
         {
@@ -46,8 +46,8 @@ PrograssiveBounds={
             "dropM":0.5,
             "randargm":5,
             "randargM":25,
-            "imgsizem":128,
-            "imgsizeM":300
+            "imgsizem":67,
+            "imgsizeM":250
         },
         "xl":
         {
@@ -57,8 +57,8 @@ PrograssiveBounds={
             "dropM":0.6,
             "randargm":5,
             "randargM":30,
-            "imgsizem":128,
-            "imgsizeM":300
+            "imgsizem":67,
+            "imgsizeM":250
         }
     }
 }

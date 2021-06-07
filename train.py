@@ -161,11 +161,12 @@ def main(args):
             if progressive is not None:
                 imgst, label = mixup(imgst, label, progressive["mix"])
                 toPIL=transforms.ToPILImage()
+
                 transform = transforms.Compose([
                     transforms.Resize((int(progressive["imgsize"]),int(progressive["imgsize"]))),
                     transforms.ToTensor(),
                 ])
-                imgs=torch.zeros((BATCH_SIZE,3,int(progressive["imgsize"]),int(progressive["imgsize"])))
+                imgs=torch.zeros((imgst.size()[0],3,int(progressive["imgsize"]),int(progressive["imgsize"])))#int(progressive["imgsize"]),int(progressive["imgsize"])))
                 for i in range(imgst.size()[0]):
                     imgs[i]=transform(randaugment(toPIL(imgst[i])))
                 imgs=imgs.to(device)
@@ -278,7 +279,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
     description="ESun Competition HandWrite Recognition")
     parser.add_argument("-e", "--epochs", type=int, default=100)
-    parser.add_argument("-b", "--batchsize", type=int, default=32)
+    parser.add_argument("-b", "--batchsize", type=int, default=16)
     parser.add_argument("-l", "--learning_rate", type=float, default=0.001)
     parser.add_argument("-el", "--ending_learning_rate", type=float, default=0.00001)
     parser.add_argument("-s", "--split_rate", type=float, default=0.8)
