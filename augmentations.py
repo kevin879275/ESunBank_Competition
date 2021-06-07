@@ -7,20 +7,20 @@ import PIL, PIL.ImageOps, PIL.ImageEnhance, PIL.ImageDraw
 import numpy as np
 import torch
 from PIL import Image
-
+FILLCOLOR = (245,245,245)
 
 def ShearX(img, v):  # [-0.3, 0.3]
     assert -0.3 <= v <= 0.3
     if random.random() > 0.5:
         v = -v
-    return img.transform(img.size, PIL.Image.AFFINE, (1, v, 0, 0, 1, 0),fillcolor=(255))
+    return img.transform(img.size, PIL.Image.AFFINE, (1, v, 0, 0, 1, 0),fillcolor=FILLCOLOR)
 
 
 def ShearY(img, v):  # [-0.3, 0.3]
     assert -0.3 <= v <= 0.3
     if random.random() > 0.5:
         v = -v
-    return img.transform(img.size, PIL.Image.AFFINE, (1, 0, 0, v, 1, 0),fillcolor=(255))
+    return img.transform(img.size, PIL.Image.AFFINE, (1, 0, 0, v, 1, 0),fillcolor=FILLCOLOR)
 
 
 def TranslateX(img, v):  # [-150, 150] => percentage: [-0.45, 0.45]
@@ -28,14 +28,14 @@ def TranslateX(img, v):  # [-150, 150] => percentage: [-0.45, 0.45]
     if random.random() > 0.5:
         v = -v
     v = v * img.size[0]
-    return img.transform(img.size, PIL.Image.AFFINE, (1, 0, v, 0, 1, 0),fillcolor=(255))
+    return img.transform(img.size, PIL.Image.AFFINE, (1, 0, v, 0, 1, 0),fillcolor=FILLCOLOR)
 
 
 def TranslateXabs(img, v):  # [-150, 150] => percentage: [-0.45, 0.45]
     assert 0 <= v
     if random.random() > 0.5:
         v = -v
-    return img.transform(img.size, PIL.Image.AFFINE, (1, 0, v, 0, 1, 0),fillcolor=(255))
+    return img.transform(img.size, PIL.Image.AFFINE, (1, 0, v, 0, 1, 0),fillcolor=FILLCOLOR)
 
 
 def TranslateY(img, v):  # [-150, 150] => percentage: [-0.45, 0.45]
@@ -43,21 +43,21 @@ def TranslateY(img, v):  # [-150, 150] => percentage: [-0.45, 0.45]
     if random.random() > 0.5:
         v = -v
     v = v * img.size[1]
-    return img.transform(img.size, PIL.Image.AFFINE, (1, 0, 0, 0, 1, v),fillcolor=(255))
+    return img.transform(img.size, PIL.Image.AFFINE, (1, 0, 0, 0, 1, v),fillcolor=FILLCOLOR)
 
 
 def TranslateYabs(img, v):  # [-150, 150] => percentage: [-0.45, 0.45]
     assert 0 <= v
     if random.random() > 0.5:
         v = -v
-    return img.transform(img.size, PIL.Image.AFFINE, (1, 0, 0, 0, 1, v),fillcolor=(255))
+    return img.transform(img.size, PIL.Image.AFFINE, (1, 0, 0, 0, 1, v),fillcolor=FILLCOLOR)
 
 
 def Rotate(img, v):  # [-30, 30]
     assert -30 <= v <= 30
     if random.random() > 0.5:
         v = -v
-    return img.rotate(v)
+    return img.rotate(v,fillcolor=FILLCOLOR)
 
 
 def AutoContrast(img, _):
@@ -253,8 +253,8 @@ class CutoutDefault(object):
 
 class RandAugment:
     def __init__(self, m=0,n=3):
-        self.n = n
-        self.m = m      # [0, 30]
+        self.n = n # [0, 30]
+        self.m = m      
         self.augment_list = augment_list()
         self.i = 0
     def __call__(self, img):
