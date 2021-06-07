@@ -136,7 +136,7 @@ def main(args):
     
     for epoch in range(START_EPOCH, Epoch):
         batchI=0
-        scheduler_poly_lr_decay.step()
+        scheduler_poly_lr_decay.step(epoch)
         progressive = None
         if PrograssiveModelDict is not None:
             randaugment= RandAugment()
@@ -211,9 +211,9 @@ def main(args):
                                                    len(valid_dataset))
 
         print(
-            "Epoch:{} Train Loss:{:.4f},  Train Accuracy:{:.4f},  Validation Loss:{:.4f},  Validation Accuracy:{:.4f}".format(
+            "Epoch:{} Train Loss:{:.4f},  Train Accuracy:{:.4f},  Validation Loss:{:.4f},  Validation Accuracy:{:.4f}, Learning Rate:{:.4f}".format(
                 epoch + 1, result_param['training_loss'][-1], result_param['training_accuracy'][-1],
-                result_param['validation_loss'][-1], result_param['validation_accuracy'][-1]))
+                result_param['validation_loss'][-1], result_param['validation_accuracy'][-1], optimizer.param_groups[0]['lr']))
 
         now_time = time.time() - since
         print("Training time is:{:.0f}m {:.0f}s".format(
