@@ -15,12 +15,13 @@ import argparse
 import torch.utils.data as data
 import json
 from torchvision.datasets import ImageFolder
+import torchvision
 import xgboost
 from utils import *
 from torch_poly_lr_decay import PolynomialLRDecay
 from tqdm import tqdm
 from pathlib import Path
-
+from augmentations import RandAugment
 
 def main(args):
     
@@ -84,7 +85,7 @@ def main(args):
     for idx, dir_ in enumerate(os.listdir(clean_image_path)):
         # if args.pretrain_cleandataset:
         dataset = ChineseHandWriteDataset(root=clean_image_path + dir_, label_dic=label_dic, transform=transform, resize=resize,
-                                    resize_size=resize_size, randaug=args.method=="efficientnetV2")
+                                    resize_size=resize_size)
             # dataset = CleanDataset(root=synthesis_path + dir_, label_dic=label_dic, transform=transform, resize=resize,
             #                             resize_size=resize_size, randaug=args.method=="efficientnetV2")
         train_set_size = int(len(dataset) * split_rate)
@@ -127,18 +128,22 @@ def main(args):
     loss = FocalLoss(weight=weights).to(device)
 
     optimizer = optim.AdamW(model.parameters(), lr=lr)
-    scheduler_poly_lr_decay = PolynomialLRDecay(optimizer, max_decay_steps=100, end_learning_rate=lr, power=2.0)
+    scheduler_poly_lr_decay = PolynomialLRDecay(optimizer, max_decay_steps=100, end_learning_rate=args.ending_learning_rate, power=2.0)
     print("------------------ training start -----------------")
 
     result_param = {'training_loss': [], 'training_accuracy': [],
                     'validation_loss': [], 'validation_accuracy': []}
-
+    
     for epoch in range(START_EPOCH, Epoch):
+        batchI=0
         scheduler_poly_lr_decay.step()
-        prograssive = None
+        progressive = None
         if PrograssiveModelDict is not None:
+            randaugment= RandAugment()
+            
             progressive = prograssiveNow(epoch, Epoch,PrograssiveModelDict)
-            dataset.progressive=progressive
+            randaugment.m=progressive["randarg"]
+            
 
             
         since = time.time()
@@ -148,14 +153,23 @@ def main(args):
         running_valid_correct = 0
         dataset.train()
         model.train()
-        if progressive is not None:
-            train_dataloader.resize=int(progressive["imgsize"])
+
         train_bar = tqdm(train_dataloader)
-        for imgs, label, folder, filename in train_bar:
-            imgs = imgs.to(device)
+        
+        for imgst, label, folder, filename in train_bar:
             label = label.to(device)
             if progressive is not None:
-                imgs, label = mixup(imgs, label, progressive["mix"])
+                imgst, label = mixup(imgst, label, progressive["mix"])
+                toPIL=transforms.ToPILImage()
+                transform = transforms.Compose([
+                    transforms.Resize((int(progressive["imgsize"]),int(progressive["imgsize"]))),
+                    transforms.ToTensor(),
+                ])
+                imgs=torch.zeros((BATCH_SIZE,3,int(progressive["imgsize"]),int(progressive["imgsize"])))
+                for i in range(imgst.size()[0]):
+                    imgs[i]=transform(randaugment(toPIL(imgst[i])))
+                imgs=imgs.to(device)
+                torchvision.utils.save_image(imgs,f"preprocessImgs/{epoch}-{batchI}.jpg")
                 setDropout(model, progressive["drop"])
                 
             optimizer.zero_grad()
@@ -266,10 +280,11 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--epochs", type=int, default=100)
     parser.add_argument("-b", "--batchsize", type=int, default=32)
     parser.add_argument("-l", "--learning_rate", type=float, default=0.001)
+    parser.add_argument("-el", "--ending_learning_rate", type=float, default=0.00001)
     parser.add_argument("-s", "--split_rate", type=float, default=0.8)
     parser.add_argument("-r", "--resize", type=int, default=True)
     parser.add_argument("-rs", "--resize_size", type=int, default=128)
-    parser.add_argument("-vb", "--validbatchsize", type=int, default=4)
+    parser.add_argument("-vb", "--validbatchsize", type=int, default=32)
     parser.add_argument('--use_gpu', dest='use_gpu', type=str2bool, default=True, help='use gpu')
     parser.add_argument("-nw", "--num_workers", type=int, default=1)
     parser.add_argument("-sd", "--seed", type=int, default=1)  # spilt random Seed
