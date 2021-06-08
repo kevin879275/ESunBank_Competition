@@ -15,12 +15,13 @@ import argparse
 import torch.utils.data as data
 import json
 from torchvision.datasets import ImageFolder
+import torchvision
 import xgboost
 from utils import *
 from torch_poly_lr_decay import PolynomialLRDecay
 from tqdm import tqdm
 from pathlib import Path
-
+from augmentations import RandAugment
 
 def main(args):
     
@@ -73,38 +74,52 @@ def main(args):
 
     clean_image_path = './color_dataset/'
     synthesis_path = './synthesis/'
+    gray_image_path = './gray_dataset/'
     # clean_transform = transforms.Compose([
     #     transforms.Grayscale(num_output_channels=1),
     #     transforms.Resize((resize_size, resize_size)),
     #     transforms.ToTensor(),
     # ])
 
-    train_dataset = []
-    valid_dataset = []
-    for idx, dir_ in enumerate(os.listdir(clean_image_path)):
-        # if args.pretrain_cleandataset:
-        dataset = ChineseHandWriteDataset(root=clean_image_path + dir_, label_dic=label_dic, transform=transform, resize=resize,
-                                    resize_size=resize_size, randaug=args.method=="efficientnetV2")
-            # dataset = CleanDataset(root=synthesis_path + dir_, label_dic=label_dic, transform=transform, resize=resize,
-            #                             resize_size=resize_size, randaug=args.method=="efficientnetV2")
-        train_set_size = int(len(dataset) * split_rate)
-        valid_set_size = len(dataset) - train_set_size
-        train_set, valid_set = data.random_split(dataset, [train_set_size, valid_set_size],
-                                                 torch.Generator().manual_seed(args.seed))
-        train_dataset.append(train_set)
-        valid_dataset.append(valid_set)
+    # Set this, control different datasets
+    data_img_list = [synthesis_path, gray_image_path]
 
-    train_dataset = data.ConcatDataset(train_dataset)
-    valid_dataset = data.ConcatDataset(valid_dataset)
+    loader_list = []
 
-    train_dataloader = DataLoader(
-        train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=args.num_workers)
+    for img_path in data_img_list:
 
-    valid_dataloader = DataLoader(
-        valid_dataset, batch_size=valid_batch_size, pin_memory=False, num_workers=args.num_workers)
+        train_dataset = []
+        valid_dataset = []
+
+        for idx, dir_ in enumerate(os.listdir(img_path)):
+            # only synthesis is diff
+            if img_path != synthesis_path: 
+                dataset = ChineseHandWriteDataset(root=img_path + dir_, label_dic=label_dic, transform=transform, resize=resize,
+                                            resize_size=resize_size, randaug=args.method=="efficientnetV2")
+            else:
+                dataset = CleanDataset(root=img_path + dir_, label_dic=label_dic, transform=transform, resize=resize,
+                                            resize_size=resize_size, randaug=args.method=="efficientnetV2")
+            train_set_size = int(len(dataset) * split_rate)
+            valid_set_size = len(dataset) - train_set_size
+            train_set, valid_set = data.random_split(dataset, [train_set_size, valid_set_size],
+                                                    torch.Generator().manual_seed(args.seed))
+            train_dataset.append(train_set)
+            valid_dataset.append(valid_set)
+
+        train_dataset = data.ConcatDataset(train_dataset)
+        valid_dataset = data.ConcatDataset(valid_dataset)
+
+        train_dataloader = DataLoader(
+            train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=args.num_workers)
+
+        valid_dataloader = DataLoader(
+            valid_dataset, batch_size=valid_batch_size, pin_memory=False, num_workers=args.num_workers)
+
+        loader_list.append((train_dataloader, valid_dataloader))
 
     print(f"model is {METHOD}")
-    model = switchModel(in_features=train_dataset[0][0].shape[0],num_classes=num_classes,args=args,METHOD=METHOD)
+    # TODO: more flex
+    model = switchModel(in_features=1,num_classes=num_classes,args=args,METHOD=METHOD)
     if args.load_model:
         modelPath = getModelPath(CHECKPOINT_FOLDER=CHECKPOINT_FOLDER,args=args)
         if modelPath != "":
@@ -127,88 +142,102 @@ def main(args):
     loss = FocalLoss(weight=weights).to(device)
 
     optimizer = optim.AdamW(model.parameters(), lr=lr)
-    scheduler_poly_lr_decay = PolynomialLRDecay(optimizer, max_decay_steps=100, end_learning_rate=lr, power=2.0)
+    scheduler_poly_lr_decay = PolynomialLRDecay(optimizer, max_decay_steps=100, end_learning_rate=args.ending_learning_rate, power=2.0)
     print("------------------ training start -----------------")
 
     result_param = {'training_loss': [], 'training_accuracy': [],
                     'validation_loss': [], 'validation_accuracy': []}
-
+    
     for epoch in range(START_EPOCH, Epoch):
-        scheduler_poly_lr_decay.step()
-        prograssive = None
+        batchI=0
+        scheduler_poly_lr_decay.step(epoch)
+        progressive = None
         if PrograssiveModelDict is not None:
-            progressive = prograssiveNow(epoch, Epoch,PrograssiveModelDict)
-            dataset.progressive=progressive
-
+            randaugment= RandAugment()
             
-        since = time.time()
-        running_training_loss = 0
-        running_training_correct = 0
-        running_valid_loss = 0
-        running_valid_correct = 0
-        dataset.train()
-        model.train()
-        if progressive is not None:
-            train_dataloader.resize=int(progressive["imgsize"])
-        train_bar = tqdm(train_dataloader)
-        for imgs, label, folder, filename in train_bar:
-            imgs = imgs.to(device)
-            label = label.to(device)
-            if progressive is not None:
-                imgs, label = mixup(imgs, label, progressive["mix"])
-                setDropout(model, progressive["drop"])
-                
-            optimizer.zero_grad()
-            out = model(imgs)
-            loss_val = loss(out, label)
-            _, pred_class = torch.max(out.data, 1)
-            running_training_correct += torch.sum(pred_class == label)
-            running_training_loss += loss_val
-            loss_val.backward()
-            optimizer.step()
-            train_bar.set_description(desc='[%d/%d] | Train Loss:%.4f' %
-                                           (epoch + 1, Epoch, loss_val.item()/
-                                                 len(imgs)))
-        with torch.no_grad():
-            dataset.eval()
-            model.eval()
-            if progressive is not None:
-                setDropout(model,0)
-            val_bar = tqdm(valid_dataloader)
-            for imgs, label , folder, filename in val_bar:
-                imgs = imgs.to(device)
+            progressive = prograssiveNow(epoch, Epoch,PrograssiveModelDict)
+            randaugment.m=progressive["randarg"]
+            
+        for train_dataloader, valid_dataloader in loader_list:
+            
+            since = time.time()
+            running_training_loss = 0
+            running_training_correct = 0
+            running_valid_loss = 0
+            running_valid_correct = 0
+            # dataset.train()
+            model.train()
+
+            train_bar = tqdm(train_dataloader)
+            
+            for imgs, label, folder, filename in train_bar:
                 label = label.to(device)
+                if progressive is not None:
+                    imgst, label = mixup(imgst, label, progressive["mix"])
+                    toPIL=transforms.ToPILImage()
+
+                    transform = transforms.Compose([
+                        transforms.Resize((int(progressive["imgsize"]),int(progressive["imgsize"]))),
+                        transforms.ToTensor(),
+                    ])
+                    imgs=torch.zeros((imgst.size()[0],3,int(progressive["imgsize"]),int(progressive["imgsize"])))#int(progressive["imgsize"]),int(progressive["imgsize"])))
+                    for i in range(imgst.size()[0]):
+                        imgs[i]=transform(randaugment(toPIL(imgst[i])))
+                    # torchvision.utils.save_image(imgs,f"preprocessImgs/{epoch}-{batchI}.jpg")
+                    setDropout(model, progressive["drop"])
+
+                imgs = imgs.to(device)
+                optimizer.zero_grad()
                 out = model(imgs)
                 loss_val = loss(out, label)
-                val_bar.set_description(desc='[%d/%d] | Validation Loss:%.4f' % (epoch + 1, Epoch, loss_val.item()/
-                                                 len(imgs)))
                 _, pred_class = torch.max(out.data, 1)
-                running_valid_correct += torch.sum(pred_class == label)
-                running_valid_loss += loss_val
+                running_training_correct += torch.sum(pred_class == label)
+                running_training_loss += loss_val
+                loss_val.backward()
+                optimizer.step()
+                train_bar.set_description(desc='[%d/%d] | Train Loss:%.4f' %
+                                            (epoch + 1, Epoch, loss_val.item()/
+                                                    len(imgs)))
+            with torch.no_grad():
+                # dataset.eval()
+                model.eval()
+                if progressive is not None:
+                    setDropout(model,0)
+                val_bar = tqdm(valid_dataloader)
+                for imgs, label , folder, filename in val_bar:
+                    imgs = imgs.to(device)
+                    label = label.to(device)
+                    out = model(imgs)
+                    loss_val = loss(out, label)
+                    val_bar.set_description(desc='[%d/%d] | Validation Loss:%.4f' % (epoch + 1, Epoch, loss_val.item()/
+                                                    len(imgs)))
+                    _, pred_class = torch.max(out.data, 1)
+                    running_valid_correct += torch.sum(pred_class == label)
+                    running_valid_loss += loss_val
 
-        result_param['training_loss'].append(
-            running_training_loss.item() / len(train_dataset) * BATCH_SIZE)
-        result_param['training_accuracy'].append(running_training_correct.item() /
-                                                 len(train_dataset))
-        result_param['validation_loss'].append(
-            running_valid_loss.item() / len(valid_dataset) * valid_batch_size)
-        result_param['validation_accuracy'].append(running_valid_correct.item() /
-                                                   len(valid_dataset))
+            result_param['training_loss'].append(
+                running_training_loss.item() / len(train_dataloader.dataset) * BATCH_SIZE)
+            result_param['training_accuracy'].append(running_training_correct.item() /
+                                                    len(train_dataloader.dataset))
+            result_param['validation_loss'].append(
+                running_valid_loss.item() / len(valid_dataloader.dataset) * valid_batch_size)
+            result_param['validation_accuracy'].append(running_valid_correct.item() /
+                                                    len(valid_dataloader.dataset))
 
-        print(
-            "Epoch:{} Train Loss:{:.4f},  Train Accuracy:{:.4f},  Validation Loss:{:.4f},  Validation Accuracy:{:.4f}".format(
-                epoch + 1, result_param['training_loss'][-1], result_param['training_accuracy'][-1],
-                result_param['validation_loss'][-1], result_param['validation_accuracy'][-1]))
+            print(
+                "Epoch:{} Train Loss:{:.4f},  Train Accuracy:{:.4f},  Validation Loss:{:.4f},  Validation Accuracy:{:.4f}, Learning Rate:{:.4f}".format(
+                    epoch + 1, result_param['training_loss'][-1], result_param['training_accuracy'][-1],
+                    result_param['validation_loss'][-1], result_param['validation_accuracy'][-1], optimizer.param_groups[0]['lr']))
 
-        now_time = time.time() - since
-        print("Training time is:{:.0f}m {:.0f}s".format(
-            now_time // 60, now_time % 60))
+            now_time = time.time() - since
+            print("Training time is:{:.0f}m {:.0f}s".format(
+                now_time // 60, now_time % 60))
 
-        torch.save(model.state_dict(), str(
-            './checkpoints/' + METHOD + '/' + "EPOCH_" + str(epoch) + ".pkl"))
-        out_file = open(str(
-            './checkpoints/' + METHOD + '/' + 'result_param.json'), "w+")
-        json.dump(result_param, out_file, indent=4)
+            torch.save(model.state_dict(), str(
+                './checkpoints/' + METHOD + '/' + "EPOCH_" + str(epoch) + ".pkl"))
+            out_file = open(str(
+                './checkpoints/' + METHOD + '/' + 'result_param.json'), "w+")
+            json.dump(result_param, out_file, indent=4)
 
     if args.xgboost:
         print("---------------Two stage - XGboost---------------------")
@@ -264,12 +293,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
     description="ESun Competition HandWrite Recognition")
     parser.add_argument("-e", "--epochs", type=int, default=100)
-    parser.add_argument("-b", "--batchsize", type=int, default=32)
+    parser.add_argument("-b", "--batchsize", type=int, default=16)
     parser.add_argument("-l", "--learning_rate", type=float, default=0.001)
+    parser.add_argument("-el", "--ending_learning_rate", type=float, default=0.00001)
     parser.add_argument("-s", "--split_rate", type=float, default=0.8)
     parser.add_argument("-r", "--resize", type=int, default=True)
     parser.add_argument("-rs", "--resize_size", type=int, default=128)
-    parser.add_argument("-vb", "--validbatchsize", type=int, default=4)
+    parser.add_argument("-vb", "--validbatchsize", type=int, default=32)
     parser.add_argument('--use_gpu', dest='use_gpu', type=str2bool, default=True, help='use gpu')
     parser.add_argument("-nw", "--num_workers", type=int, default=1)
     parser.add_argument("-sd", "--seed", type=int, default=1)  # spilt random Seed
