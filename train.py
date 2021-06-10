@@ -41,11 +41,11 @@ def main(args):
     START_EPOCH = LAST_EPOCH + 1 if LAST_EPOCH is not None else 0
     BATCH_SIZE = args.batchsize
     
-    path_gray_image = 'datasets/esun_v2_color/gray_dataset/'
-    path_synthesis = 'datasets/synthesis/'
+    path_color_image = 'datasets/esun_v2_color/color_dataset/'
+    path_synthesis_rgb = 'datasets/SynthesisDataRGB/'
     path_name = 'datasets/name/' 
     path_common_word = 'datasets/common_word/'
-    path_label = 'datasets/Esun_new_dic.txt'
+    path_label = 'datasets/Esun_common.txt'
     
     NUM_WORKERS = args.num_workers
     SEED = args.seed
@@ -67,17 +67,17 @@ def main(args):
     # ========================================================================================
     #   Data Loader
     # ========================================================================================
-    dataset_path_list = [path_gray_image, path_synthesis, path_name, path_common_word]
+    dataset_path_list = [path_color_image, path_synthesis_rgb, path_common_word]
     loader_list = []
 
     for img_path in dataset_path_list:
         train_dataset, valid_dataset = [], []
         for _, dir_ in enumerate(os.listdir(img_path)):
-            if img_path == path_gray_image:
+            if img_path == path_color_image:
                 dataset = ChineseHandWriteDataset(
                     root=img_path + dir_, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
                     resize_size=RESIZE_SIZE, randaug=USE_RANDAUG)
-            elif img_path == path_synthesis:
+            elif img_path == path_synthesis_rgb:
                 dataset = CleanDataset(
                     root=img_path + dir_, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
                     resize_size=RESIZE_SIZE, randaug=USE_RANDAUG)
@@ -116,7 +116,7 @@ def main(args):
     # ========================================================================================
     print(f"model is {METHOD}")
     
-    model = switchModel(in_features=1, num_classes=NUM_CLASSES, args=args, METHOD=METHOD)
+    model = switchModel(in_features=3, num_classes=NUM_CLASSES, args=args, METHOD=METHOD)
     if args.load_model:
         modelPath = getModelPath(CHECKPOINT_FOLDER=CHECKPOINT_FOLDER,args=args)
         if modelPath != "":
@@ -178,17 +178,17 @@ def main(args):
             
             result_param['train_loss'].append(
                 sum_train_loss.item() / len(train_dataloader.dataset))
-            result_param['training_accuracy'].append(
+            result_param['train_acc'].append(
                 sum_train_correct.item() / len(train_dataloader.dataset))
-            result_param['validation_loss'].append(
+            result_param['val_loss'].append(
                 sum_val_loss.item() / len(valid_dataloader.dataset))
-            result_param['validation_accuracy'].append(
+            result_param['val_acc'].append(
                 sum_val_correct.item() / len(valid_dataloader.dataset))
 
             print("Epoch:{} Train Loss:{:.4f}, Train Accuracy:{:.4f}, Validation Loss:{:.4f}, Validation Accuracy:{:.4f}, Learning Rate:{:.4f}".format(
                 epoch + 1, 
-                result_param['training_loss'][-1], result_param['training_accuracy'][-1],
-                result_param['validation_loss'][-1], result_param['validation_accuracy'][-1], 
+                result_param['train_loss'][-1], result_param['train_acc'][-1],
+                result_param['val_loss'][-1], result_param['val_acc'][-1], 
                 optimizer.param_groups[0]['lr'])
             )
 

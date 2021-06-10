@@ -112,13 +112,11 @@ def load_word_dic(label_path):
     label_dic[idx+1] = "isnull"
     return label_dic
 
-def switchModel(in_features,num_classes,args,METHOD):
+def switchModel(in_features, num_classes, args, METHOD):
     if args.method == "efficientnet":
-        model = EfficientNet.from_pretrained(
-            METHOD, in_channels=1, num_classes=num_classes)
+        model = EfficientNet.from_pretrained(METHOD, in_channels=in_features, num_classes=num_classes)
     elif METHOD == "regnet":
-        model = RegNetx(in_features, num_classes,
-                        model='regnety_002', pretrained=True)
+        model = RegNetx(in_features, num_classes, model='regnety_002', pretrained=True)
     elif re.match(r'efficientnetV2', METHOD):
         model = efficientnetV2[args.method_level]()
     return model
