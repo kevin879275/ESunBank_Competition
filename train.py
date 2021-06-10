@@ -106,7 +106,7 @@ def main(args):
         print('In {}, Num of Train Data: {}, Num of Validation Data: {}'.format(img_path.split('/')[-2], len(train_dataset), len(valid_dataset)))
 
         train_dataloader = DataLoader(
-            train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=NUM_WORKERS)
+            train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=False, num_workers=NUM_WORKERS)
         valid_dataloader = DataLoader(
             valid_dataset, batch_size=BATCH_SIZE, pin_memory=False, num_workers=NUM_WORKERS)
 
@@ -214,7 +214,7 @@ if __name__ == "__main__":
     parser.add_argument("-rs", "--resize_size", type=int, default=128)
     parser.add_argument("-vb", "--validbatchsize", type=int, default=256)
     parser.add_argument('--use_gpu', dest='use_gpu', type=str2bool, default=True, help='use gpu')
-    parser.add_argument("-nw", "--num_workers", type=int, default=1)
+    parser.add_argument("-nw", "--num_workers", type=int, default=0)
     parser.add_argument("-sd", "--seed", type=int, default=1)  # spilt random seed
     
     ### Checkpoint Path / Select Method ###
