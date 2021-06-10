@@ -73,6 +73,7 @@ def main(args):
     for img_path in dataset_path_list:
         train_dataset, valid_dataset = [], []
         for _, dir_ in enumerate(os.listdir(img_path)):
+            if _ > 3: break
             if img_path == path_gray_image:
                 dataset = ChineseHandWriteDataset(
                     root=img_path + dir_, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
@@ -178,17 +179,17 @@ def main(args):
             
             result_param['train_loss'].append(
                 sum_train_loss.item() / len(train_dataloader.dataset))
-            result_param['training_accuracy'].append(
+            result_param['train_acc'].append(
                 sum_train_correct.item() / len(train_dataloader.dataset))
-            result_param['validation_loss'].append(
+            result_param['val_loss'].append(
                 sum_val_loss.item() / len(valid_dataloader.dataset))
-            result_param['validation_accuracy'].append(
+            result_param['val_acc'].append(
                 sum_val_correct.item() / len(valid_dataloader.dataset))
 
             print("Epoch:{} Train Loss:{:.4f}, Train Accuracy:{:.4f}, Validation Loss:{:.4f}, Validation Accuracy:{:.4f}, Learning Rate:{:.4f}".format(
                 epoch + 1, 
-                result_param['training_loss'][-1], result_param['training_accuracy'][-1],
-                result_param['validation_loss'][-1], result_param['validation_accuracy'][-1], 
+                result_param['train_loss'][-1], result_param['train_acc'][-1],
+                result_param['val_loss'][-1], result_param['val_acc'][-1], 
                 optimizer.param_groups[0]['lr'])
             )
 
