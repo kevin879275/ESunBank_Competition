@@ -142,3 +142,9 @@ training data dic.txt
 
 
 *.pkl
+
+datasets/
+images/
+legacy/
+
+*.sh

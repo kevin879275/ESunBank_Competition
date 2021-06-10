@@ -1,16 +1,15 @@
-import numpy as np
-import torch
-import random
-
-from pathlib import Path
-from efficientnet_pytorch import EfficientNet
 import os
 import re
+import argparse
+import random
+from pathlib import Path
 
+import numpy as np
 import torch
-
+from efficientnet_pytorch import EfficientNet
 
 from model import *
+
 '''Argumentation'''
 
 PrograssiveBounds={
@@ -63,12 +62,6 @@ PrograssiveBounds={
     }
 }
 
-
-
-
-
-
-from torchvision.datasets import ImageFolder
 def getFinalEpoch(args,CHECKPOINT_FOLDER):  # return last epoch num (final training saved)
 
     start_epoch = args.start_epoch
@@ -88,14 +81,13 @@ def getFinalEpoch(args,CHECKPOINT_FOLDER):  # return last epoch num (final train
 
     if start_epoch == -1:
         return max(nums)
-    # search specific number
+    
     if start_epoch in nums:
         return start_epoch
     else:
         print(
             f"<Warning> No such a Start epoch checkpoint file #{start_epoch} exists, which is file {CHECKPOINT_FOLDER}EPOCH_{start_epoch}.pkl")
     return None
-
 
 def getModelPath(CHECKPOINT_FOLDER,args):
     num = getFinalEpoch(CHECKPOINT_FOLDER=CHECKPOINT_FOLDER,args=args)
@@ -109,7 +101,7 @@ def load_label_dic(label_path):
     f = open(label_path, 'r', encoding="utf-8")
     for idx, line in enumerate(f.readlines()):
         label_dic[line[0]] = idx
-    label_dic[800] = "isnull"
+    label_dic[idx+1] = "isnull"
     return label_dic
 
 def load_word_dic(label_path):
@@ -117,10 +109,8 @@ def load_word_dic(label_path):
     f = open(label_path, 'r', encoding="utf-8")
     for idx, line in enumerate(f.readlines()):
         label_dic[idx] = line[0]
-    label_dic[800] = "isnull"
+    label_dic[idx+1] = "isnull"
     return label_dic
-
-
 
 def switchModel(in_features,num_classes,args,METHOD):
     if args.method == "efficientnet":
@@ -131,13 +121,12 @@ def switchModel(in_features,num_classes,args,METHOD):
                         model='regnety_002', pretrained=True)
     elif re.match(r'efficientnetV2', METHOD):
         model = efficientnetV2[args.method_level]()
-
     return model
 
 
-def getWeights(root,split_rate):
+def getWeights(root,split_rate,len_data):
     label_num = {}
-    for i in range(801):
+    for i in range(len_data):
         label_num[str(i)] = None
     for idx, dir_ in enumerate(os.listdir(root)):
         nSamples = len(os.listdir(root + dir_))
@@ -152,7 +141,6 @@ def getWeights(root,split_rate):
     weights = torch.FloatTensor(weights)
     return weights
 
-
 def prograssiveNow(epoch,num_epochs,boudDictofModel):
     pa = epoch/(num_epochs -1)
     args = ["mix","drop","randarg","imgsize"]
@@ -160,7 +148,6 @@ def prograssiveNow(epoch,num_epochs,boudDictofModel):
     for arg in args:
         ansDict[arg]=boudDictofModel[f"{arg}m"]+(boudDictofModel[f"{arg}M"]-boudDictofModel[f"{arg}m"])*pa
     return ansDict
-
 
 def setDropout(model, drop_rate=0.1):
     for name, child in model.named_children():
