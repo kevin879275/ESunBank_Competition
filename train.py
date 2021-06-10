@@ -105,7 +105,7 @@ def main(args):
         print('In {}, Num of Train Data: {}, Num of Validation Data: {}'.format(img_path.split('/')[-2], len(train_dataset), len(valid_dataset)))
 
         train_dataloader = DataLoader(
-            train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=NUM_WORKERS)
+            train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=False, num_workers=NUM_WORKERS)
         valid_dataloader = DataLoader(
             valid_dataset, batch_size=BATCH_SIZE, pin_memory=False, num_workers=NUM_WORKERS)
 
