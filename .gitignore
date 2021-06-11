@@ -140,5 +140,7 @@ training data dic.txt
 #configuration file
 *.json
 
-
+*.png
 *.pkl
+*.zip
+*.txt
