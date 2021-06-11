@@ -67,13 +67,12 @@ def main(args):
     # ========================================================================================
     #   Data Loader
     # ========================================================================================
-    dataset_path_list = [path_gray_image, path_synthesis, path_name, path_common_word]
+    dataset_path_list = [path_gray_image, path_synthesis, path_common_word]
     loader_list = []
 
     for img_path in dataset_path_list:
         train_dataset, valid_dataset = [], []
         for _, dir_ in enumerate(os.listdir(img_path)):
-            if _ > 3: break
             if img_path == path_gray_image:
                 dataset = ChineseHandWriteDataset(
                     root=img_path + dir_, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
@@ -208,11 +207,10 @@ if __name__ == "__main__":
     
     parser.add_argument("-e", "--epochs", type=int, default=100)
     parser.add_argument("-b", "--batchsize", type=int, default=16)
-    parser.add_argument("-l", "--learning_rate", type=float, default=0.001)
-    parser.add_argument("-el", "--ending_learning_rate", type=float, default=0.00001)
+    parser.add_argument("-lr", "--learning_rate", type=float, default=0.001)
+    parser.add_argument("-ending-lr", "--ending_learning_rate", type=float, default=0.00001)
     parser.add_argument("-s", "--split_rate", type=float, default=0.8)
     parser.add_argument("-rs", "--resize_size", type=int, default=128)
-    parser.add_argument("-vb", "--validbatchsize", type=int, default=256)
     parser.add_argument('--use_gpu', dest='use_gpu', type=str2bool, default=True, help='use gpu')
     parser.add_argument("-nw", "--num_workers", type=int, default=0)
     parser.add_argument("-sd", "--seed", type=int, default=1)  # spilt random seed
