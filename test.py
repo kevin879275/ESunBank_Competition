@@ -1,50 +1,33 @@
-import os
-import shutil
-import numpy as np
-import torch
-import torch.nn.functional as F
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data.dataset import ConcatDataset
-import torchvision.models
-from torchsummary import summary
-from torch.utils.data import Dataset, DataLoader
-from model import *
-import torchvision.transforms as transforms
-from DataLoader import ChineseHandWriteDataset, CleanDataset
-import time
-import matplotlib.pyplot as plt
 import argparse
-import torch.utils.data as data
 import json
-from torchvision.datasets import ImageFolder
-import xgboost
-from utils import *
-from torch_poly_lr_decay import PolynomialLRDecay
-from tqdm import tqdm
+import os
+import time
 from pathlib import Path
-from shutil import move
+from tqdm import tqdm
+
+import matplotlib.pyplot as plt
+import torch
+import torch.optim as optim
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader, ConcatDataset, random_split
+from torch_poly_lr_decay import PolynomialLRDecay
+
+from model import *
+from utils import *
+from DataLoader import ChineseHandWriteDataset, CleanDataset, NameDataset, CommonWordDataset
+
 
 def main(args):
-    
-    # file path
-    image_path = './train_image'
-    path = './data'
-    label_path = 'training data dic.txt'
-
-
-    # Hyper Parameters
-    PrograssiveModelDict=None
+    # ========================================================================================
+    #   Variables
+    # ========================================================================================
     if args.method == "efficientnet" or args.method == "efficientnetV2":
         METHOD = f"{args.method}-{args.method_level}"
-        if args.method == "efficientnetV2":
-            PrograssiveModelDict = PrograssiveBounds[args.method][args.method_level]
     elif args.method == 'regnet':
         METHOD = args.method
     else:
         METHOD = args.method + args.method_level
-
-    # Environment
+    
     if args.use_gpu and torch.cuda.is_available():
         device = torch.device('cuda')
         torch.backends.cudnn.benchmark = True
@@ -52,170 +35,122 @@ def main(args):
         device = torch.device('cpu')
         print('Warning! Using CPU.')
 
-    Epoch = args.epochs
-    BATCH_SIZE = args.batchsize
-    lr = args.learning_rate
-    split_rate = args.split_rate
-    resize = args.resize
-    resize_size = args.resize_size
-    num_classes = 801
-
     CHECKPOINT_FOLDER = args.checkpoint_root + METHOD + '/'
-    START_EPOCH = getFinalEpoch(args=args,CHECKPOINT_FOLDER=CHECKPOINT_FOLDER) + 1 if getFinalEpoch(args=args,CHECKPOINT_FOLDER=CHECKPOINT_FOLDER) is not None else 0
-
-    is_useweight = True
-    print("init data folder")
-
-    Path(CHECKPOINT_FOLDER).mkdir(exist_ok=True,parents=True)
     
-    label_dic = load_label_dic(label_path)
-    word_dic = load_word_dic(label_path)
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-    ])
-
-    clean_image_path = './train_image/'
-    synthesis_path = './synthesis/'
-    test_dataset="./322/"
-    # clean_transform = transforms.Compose([
-    #     transforms.Grayscale(num_output_channels=1),
-    #     transforms.Resize((resize_size, resize_size)),
-    #     transforms.ToTensor(),
-    # ])
-
+    BATCH_SIZE = args.batchsize
     
+    test_dataset = 'ESunTestData2/'
+    path_label = 'training_data_dic.txt'
+    
+    USE_PADDING = args.use_padding
+    PADDING_FN = padding if USE_PADDING else None
+    RESIZE_SIZE = args.resize_size
+    RESIZE = False if RESIZE_SIZE == 0 or USE_PADDING else True
 
-    # dataset = ChineseHandWriteDataset(root=test_dataset, label_dic=label_dic, transform=transform, resize=resize,
-    #                             resize_size=resize_size, randaug=args.method=="efficientnetV2")
-    datasett=[]
-    for idx, dir_ in enumerate(os.listdir(clean_image_path)):
-        dataset = ChineseHandWriteDataset(root=clean_image_path + dir_, label_dic=label_dic, transform=transform, resize=resize,
-                                  resize_size=resize_size, randaug=args.method=="efficientnetV2")
-        datasett.append(dataset)
-    dataset= ConcatDataset(datasett)
+    NUM_WORKERS = args.num_workers
+    WORD_TO_IDX_DICT = load_label_dic(path_label)
+    IDX_TO_WORD_DICT = load_word_dic(path_label)
+    TRNASFORM = transforms.Compose([transforms.ToTensor()])
+    USE_RANDAUG = (args.method=="efficientnetV2")
+
+    NUM_CLASSES = len(WORD_TO_IDX_DICT)
+
+    ISNULL_THRESHOLD = args.threshold
 
 
+    # ========================================================================================
+    #   Data Loader
+    # ========================================================================================
+    dataset = ChineseHandWriteDataset(
+        root=test_dataset, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
+        resize_size=RESIZE_SIZE, randaug=USE_RANDAUG)
     dataloader = DataLoader(
-        dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=args.num_workers)
-
-
-
+        dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=False, num_workers=NUM_WORKERS, collate_fn=PADDING_FN)
+    
+    # ========================================================================================
+    #   Testing
+    # ========================================================================================
     print(f"model is {METHOD}")
-    model = switchModel(in_features=dataset[0][0].shape[0],num_classes=num_classes,args=args,METHOD=METHOD)
+    model = switchModel(in_features=dataset[0][0].shape[0], num_classes=NUM_CLASSES, args=args, METHOD=METHOD)
     if args.load_model:
-        modelPath = getModelPath(CHECKPOINT_FOLDER=CHECKPOINT_FOLDER,args=args)
+        modelPath = getModelPath(CHECKPOINT_FOLDER=CHECKPOINT_FOLDER, args=args)
         if modelPath != "":
             model.load_state_dict(torch.load(modelPath))
-
-
     model.to(device)
 
 
-    # get each class weight
-    weights = None
-    if is_useweight:
-        weights = getWeights(root=clean_image_path,split_rate=split_rate)
-
-    # Label smoothing
-    # loss = SmoothCrossEntropyLoss(weight=weights).to(device)
-
-    # Focal Loss
-    loss = FocalLoss(weight=weights).to(device)
-
-
-    print("------------------ testing start -----------------")
-
-    result_param = {'training_loss': [], 'training_accuracy': [],
-                    'validation_loss': [], 'validation_accuracy': []}
-
-        
-    since = time.time()
-    running_valid_loss = 0
-    running_valid_correct = 0
-    wrong_output = f"./testwrong/{METHOD}/"
-    Path(wrong_output).mkdir(exist_ok=True,parents=True)
+    print("------------------ Start Testing  -----------------")
     with torch.no_grad():
         model.eval()
         val_bar = tqdm(dataloader)
-        for imgs, label, folder, filename in val_bar:
+        
+        sum_test_correct = 0
+        for batch_img, batch_label, folder, filename in val_bar:
+            batch_img, batch_label = batch_img.to(device), batch_label.to(device)
             
+            output = model(batch_img)
+            output = F.softmax(output, dim=1)
             
-            imgs = imgs.to(device)
-            label = label.to(device)
-            out = model(imgs)
-            loss_val = loss(out, label)
-            val_bar.set_description(desc='Test Loss:%.4f' % (loss_val.item()/
-                                            len(imgs)))
-            _, pred_class = torch.max(out.data, 1)
-            running_valid_correct += torch.sum(pred_class == label)
-            out=F.softmax(out,dim=1)
-            for i in range(len(imgs)):
-                if pred_class[i]!=label[i]:
+            pred_values, pred_classes = torch.max(output, 1)
+            if ISNULL_THRESHOLD != -1:
+                pred_classes[pred_values < ISNULL_THRESHOLD] = NUM_CLASSES - 1
+            sum_test_correct += torch.sum(pred_classes == batch_label)
+
+            print()
+            for i in range(len(batch_img)):
+                if pred_classes[i] != batch_label[i]:
+                    k = 5 
+                    pred_classes_topk_values, pred_classes_topk_indices = \
+                        torch.topk(output.data, k, dim=1)
                     
-                    pred_classes=torch.topk(out.data, 5,1)
-                    fromp=f"{folder[i]}{filename[i]}"
-                    pcs=[]
-                    for j in range(pred_classes.indices[i].size()[0]):
-                        pre=word_dic[pred_classes.indices[i][j].item()]
-                        pro=pred_classes.values[i][j].item()
-                        pcs.append(pre)
-                        pcs.append(str(round(pro,3)))
+                    fromp = f"{folder[i]}{filename[i]}"
                     
-                    
-                    pcs=",".join(pcs)
-                    num = folder[i].split("/")[-1]
-                    outF=f"{wrong_output}{num}/"
-                    Path(outF).mkdir(parents=True,exist_ok=True)
-                    outp=f"{outF}p{pcs}_l{filename[i]}"
-                    torchvision.utils.save_image(imgs[i],outp)
-                    
-                    move(f"{folder[i]}/{filename[i]}",f"{outF}{filename[i]}")
+                    topk_probs = []
+                    for j in range(k):
+                        pred_idx = pred_classes_topk_indices[i][j].item()
+                        pred_word = IDX_TO_WORD_DICT[pred_idx]
+                        value = pred_classes_topk_values[i][j].item()
+                        word_prob = f"{pred_word}-{round(value,3)}"
+                        topk_probs.append(word_prob)
+                    topk_probs = ",".join(topk_probs) + ".png"
+                    print(topk_probs)
 
-            running_valid_loss += loss_val
+                    show_use_padding = lambda: "padding" if USE_PADDING else "resize"
+                    wront_output_folder = f'result/{show_use_padding()}-{ISNULL_THRESHOLD}'
+                    wront_output_path = os.path.join(wront_output_folder, topk_probs)
+                    os.makedirs(wront_output_folder, exist_ok=True)
+                    torchvision.utils.save_image(batch_img[i], wront_output_path)
 
+            val_bar.set_description()
 
-    result_param['validation_loss'].append(
-        running_valid_loss.item() / len(dataset) * BATCH_SIZE)
-    result_param['validation_accuracy'].append(running_valid_correct.item() /
-                                            len(dataset))
+    print("Test Accuracy:{:.4f}".format(sum_test_correct / len(dataset)))
 
-    print(
-        "Test Loss:{:.4f},  Test Accuracy:{:.4f}".format(
-            result_param['validation_loss'][-1], result_param['validation_accuracy'][-1]))
-
-    now_time = time.time() - since
-
-
-
-
-
-
- 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-    description="ESun Competition HandWrite Recognition")
+    parser = argparse.ArgumentParser(description="ESun Competition HandWrite Recognition")
+    
     parser.add_argument("-e", "--epochs", type=int, default=100)
-    parser.add_argument("-b", "--batchsize", type=int, default=1)
-    parser.add_argument("-l", "--learning_rate", type=float, default=0.0001)
+    parser.add_argument("-b", "--batchsize", type=int, default=512)
+    parser.add_argument("-l", "--learning_rate", type=float, default=0.001)
+    parser.add_argument("-el", "--ending_learning_rate", type=float, default=0.00001)
     parser.add_argument("-s", "--split_rate", type=float, default=0.8)
-    parser.add_argument("-r", "--resize", type=int, default=True)
     parser.add_argument("-rs", "--resize_size", type=int, default=128)
     parser.add_argument('--use_gpu', dest='use_gpu', type=str2bool, default=True, help='use gpu')
     parser.add_argument("-nw", "--num_workers", type=int, default=1)
-    parser.add_argument("-sd", "--seed", type=int, default=1)  # spilt random Seed
-    parser.add_argument("-xgb", "--xgboost", type=str2bool, default=False) # use xgboost or not
-    ### Checkpoint Path / Select Method ###
-    # Method save name and load name
-    parser.add_argument("-m", "--method", type=str, default="efficientnetV2")
-    # Method level e.g. b0, b1, b2, b3 or S, M, L
-    parser.add_argument("-ml", "--method_level", type=str, default="m")
-    # final save name => method + method_level , e.g. efficientNetb0
+    parser.add_argument("-sd", "--seed", type=int, default=1)  # spilt random seed
+    parser.add_argument("-th", "--threshold", type=float, default=-1) # -1 to not set threshold
+    parser.add_argument("--use-padding", type=str2bool, default=False)
 
+    ### Checkpoint Path / Select Method ###
+    ### final save name => method + method_level, e.g. efficientNet-b0
+    parser.add_argument("-m", "--method", type=str, default="efficientnetV2") # Method save name and load name
+    parser.add_argument("-ml", "--method_level", type=str, default="m") # Method level e.g. b0, b1, b2, b3 or S, M, L
+    
     ### Load Model Settings ###
-    # Load from epoch, -1 = final epoch in checkpoint
+    ### Load from epoch, -1 = final epoch in checkpoint
     parser.add_argument("-se", "--start_epoch", type=int, default=-1)
-    parser.add_argument("-L", "--load_model", type=str2bool,
-                    default=True)  # Load model or train from 0
-    parser.add_argument("-cr","--checkpoint_root",type=str,default="./checkpoints/")
+    parser.add_argument("-L", "--load_model", type=str2bool, default=True)  # Load model or train from 0
+    parser.add_argument("-cr","--checkpoint_root", type=str, default="./checkpoints/")
+    parser.add_argument("-data","--dataset", type=str, default="")
+    
     main(parser.parse_args())
