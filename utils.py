@@ -188,3 +188,14 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
+def padding(images):
+    tensors, labels, paths1, paths2 = list(zip(*images))
+    max_size = (max([t.shape[-2] for t in tensors]), max([t.shape[-1] for t in tensors]))
+    batch_shape = [len(tensors)] + list(tensors[0].shape[:-2]) + list((max_size))
+    
+    batched_imgs = tensors[0].new_full(batch_shape, 245.0 / 255.0)
+    for img, pad_img in zip(tensors, batched_imgs):
+        pad_img[..., : img.shape[-2], : img.shape[-1]].copy_(img)
+
+    return batched_imgs, torch.Tensor(labels).long(), paths1, paths2

@@ -16,6 +16,7 @@ from model import *
 from utils import *
 from DataLoader import ChineseHandWriteDataset, CleanDataset, NameDataset, CommonWordDataset
 
+
 def main(args):
     # ========================================================================================
     #   Variables
@@ -51,6 +52,7 @@ def main(args):
 
     NUM_CLASSES = len(WORD_TO_IDX_DICT)
 
+
     # ========================================================================================
     #   Data Loader
     # ========================================================================================
@@ -82,12 +84,13 @@ def main(args):
             batch_img, batch_label = batch_img.to(device), batch_label.to(device)
             output = model(batch_img)
             _, pred_class = torch.max(output, 1)
-
+            
             sum_test_correct += torch.sum(pred_class == batch_label)
 
             val_bar.set_description()
 
     print("Test Accuracy:{:.4f}".format(sum_test_correct / len(dataset)))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ESun Competition HandWrite Recognition")
@@ -102,6 +105,7 @@ if __name__ == "__main__":
     parser.add_argument('--use_gpu', dest='use_gpu', type=str2bool, default=True, help='use gpu')
     parser.add_argument("-nw", "--num_workers", type=int, default=1)
     parser.add_argument("-sd", "--seed", type=int, default=1)  # spilt random seed
+    parser.add_argument("--use-padding", type=bool, default=True)                                                                                                                                                          )
     
     ### Checkpoint Path / Select Method ###
     ### final save name => method + method_level, e.g. efficientNet-b0

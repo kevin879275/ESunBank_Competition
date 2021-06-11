@@ -64,6 +64,10 @@ def main(args):
     NUM_CLASSES = len(WORD_TO_IDX_DICT)
     FL_USE_WEIGHT = False
 
+    USE_PADDING = args.use_padding
+    PADDING_FN = padding if USE_PADDING else None
+    ISNULL_THRESHOLD = args.threshold
+
     # ========================================================================================
     #   Data Loader
     # ========================================================================================
@@ -105,12 +109,12 @@ def main(args):
         print('In {}, Num of Train Data: {}, Num of Validation Data: {}'.format(img_path.split('/')[-2], len(train_dataset), len(valid_dataset)))
 
         train_dataloader = DataLoader(
-            train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=False, num_workers=NUM_WORKERS)
+            train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=False, num_workers=NUM_WORKERS, collate_fn=PADDING_FN)
         valid_dataloader = DataLoader(
-            valid_dataset, batch_size=BATCH_SIZE, pin_memory=False, num_workers=NUM_WORKERS)
+            valid_dataset, batch_size=BATCH_SIZE, pin_memory=False, num_workers=NUM_WORKERS, collate_fn=PADDING_FN)
 
         loader_list.append((train_dataloader, valid_dataloader))
-
+    
     # ========================================================================================
     #   Training
     # ========================================================================================
@@ -148,14 +152,17 @@ def main(args):
                 output = model(batch_img)
 
                 loss = criterion(output, batch_label)
-                _, pred_class = torch.max(output, 1)
+                if ISNULL_THRESHOLD != -1:
+                    output = F.softmax(output,dim = 1)
+                    pred_values, pred_classes = torch.max(output, dim=1)
+                    pred_classes[pred_values < ISNULL_THRESHOLD] = NUM_CLASSES
 
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
                 
                 sum_train_loss += loss
-                sum_train_correct += torch.sum(pred_class == batch_label)
+                sum_train_correct += torch.sum(pred_classes == batch_label)
                 train_bar.set_description(
                     desc='[%d/%d] | Train Loss:%.4f' % (epoch + 1, EPOCH, loss.item() / len(batch_img)))
             
@@ -168,10 +175,16 @@ def main(args):
                     output = model(batch_img)
                     
                     loss = criterion(output, batch_label)
+                    loss = loss / len(batch_img)
+
                     _, pred_class = torch.max(output, 1)
+                    if ISNULL_THRESHOLD != -1:
+                        output = F.softmax(output,dim = 1)
+                        pred_values, pred_classes = torch.max(output, dim=1)
+                        pred_classes[pred_values < ISNULL_THRESHOLD] = NUM_CLASSES
 
                     val_bar.set_description(
-                        desc='[%d/%d] | Validation Loss:%.4f' % (epoch + 1, EPOCH, loss.item() / len(batch_img)))
+                        desc='[%d/%d] | Validation Loss:%.4f' % (epoch + 1, EPOCH, loss.item()))
                     
                     sum_val_loss += loss
                     sum_val_correct += torch.sum(pred_class == batch_label)
@@ -210,10 +223,12 @@ if __name__ == "__main__":
     parser.add_argument("-lr", "--learning_rate", type=float, default=0.001)
     parser.add_argument("-ending-lr", "--ending_learning_rate", type=float, default=0.00001)
     parser.add_argument("-s", "--split_rate", type=float, default=0.8)
-    parser.add_argument("-rs", "--resize_size", type=int, default=128)
+    parser.add_argument("-rs", "--resize_size", type=int, default=0) # 0 to not resize
     parser.add_argument('--use_gpu', dest='use_gpu', type=str2bool, default=True, help='use gpu')
     parser.add_argument("-nw", "--num_workers", type=int, default=0)
     parser.add_argument("-sd", "--seed", type=int, default=1)  # spilt random seed
+    parser.add_argument("-th", "--threshold", type=float, default=0.7)
+    parser.add_argument("--use-padding", type=str2bool, default=True)
     
     ### Checkpoint Path / Select Method ###
     ### final save name => method + method_level, e.g. efficientNet-b0
