@@ -82,7 +82,7 @@ parser.add_argument("-L", "--load_model", type=str2bool,
                     default=True)  # Load model or train from 0
 
 ### Flask Args ###
-parser.add_argument('-p', '--port', default=80, help='port')
+parser.add_argument('-p', '--port', default=8080, help='port')
 parser.add_argument('-d', '--debug', default=False, help='debug')
 parser.add_argument("-th", "--threshold", type=float, default=0.7)
 args = parser.parse_args()
