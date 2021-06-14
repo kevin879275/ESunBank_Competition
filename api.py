@@ -37,10 +37,10 @@ import torch.utils.data as data
 import json
 from torchvision.datasets import ImageFolder
 from testDataStealer import Stealer
-
+from pathlib import Path
 #### Efficient Net V1
 from efficientnet_pytorch import EfficientNet
-
+from utils import getFinalEpoch
 try:
     from tqdm import tqdm
 except ImportError:
@@ -84,8 +84,7 @@ parser.add_argument("-L", "--load_model", type=str2bool,
 ### Flask Args ###
 parser.add_argument('-p', '--port', default=80, help='port')
 parser.add_argument('-d', '--debug', default=False, help='debug')
-
-
+parser.add_argument("-th", "--threshold", type=float, default=0.7)
 args = parser.parse_args()
 
 # file path
@@ -110,7 +109,7 @@ resize_size = args.resize_size
 num_classes = 801
 valid_batch_size = args.validbatchsize
 START_EPOCH = 0
-
+ISNULL_THRESHOLD = args.threshold
 ## save data from ESunTest api request
 stealer = Stealer() 
 stealer.start()
@@ -137,25 +136,13 @@ def getWordFromResult(result):
     _, pred_class = torch.max(result.data, 1)
     return label_dic[pred_class.item()]
 
+
+
 def getModelPath():
-    start_epoch = args.start_epoch
     CHECKPOINT_FOLDER = './checkpoints/' + METHOD + '/'
-    files = [x for x in filter(lambda x:re.match(
-        f'.*EPOCH_\d+.pkl', x), os.listdir(CHECKPOINT_FOLDER))]
-    global START_EPOCH
-    if start_epoch == -1:
-        start_epoch = len(files)-1
-    if start_epoch > len(files)-1:
-        print(f"input start epoch {start_epoch} no exist model")
-        return ""
-    if start_epoch == -1:
-        start_epoch = 0
-    for file in files:
-        r = re.match(r'EPOCH_(\d+).pkl', file)
-        num = int(r.groups(1)[0])
-        if num == start_epoch:
-            START_EPOCH = start_epoch
-            return f"{CHECKPOINT_FOLDER}EPOCH_{num}.pkl"
+    num = getFinalEpoch(CHECKPOINT_FOLDER=CHECKPOINT_FOLDER,args=args)
+    if num is not None:
+        return f"{CHECKPOINT_FOLDER}EPOCH_{num}.pkl"
     return ""
 
 
@@ -272,7 +259,9 @@ def transformImage(pilImg):
     image = image.resize((args.resize_size, args.resize_size))
     image = transform(image)
     return image
-
+@app.route("/")
+def index():
+    return f" Server runing model {METHOD}"
 @app.route('/inference', methods=['POST'])
 def inference():
     """ API that return your model predictions when E.SUN calls this API. """
@@ -291,9 +280,12 @@ def inference():
     image =  transformImage(image)
     image = torch.tensor(image).to(device).unsqueeze(0)#batch
     
-    result = model(image)
-
-
+    output = model(image)
+    if ISNULL_THRESHOLD != -1:
+        output = F.softmax(output,dim = 1)
+        pred_values, pred_classes = torch.max(output, dim=1)
+        pred_classes[pred_values < ISNULL_THRESHOLD] = 800 #NUM_CLASSES
+    result = output
     t = datetime.datetime.now()
     ts = str(int(t.utcnow().timestamp()))
     server_uuid = generate_server_uuid(CAPTAIN_EMAIL + ts)
