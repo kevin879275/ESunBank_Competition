@@ -33,8 +33,8 @@ class Stealer:
         if  self.pause or len(self.imgs)<=0:
             return None
         while len(self.imgs)>0:
-            i=self.imgs.pop(0)
-            i.save(f'{self.saveFolder}{self.index}.{self.suffix}')
+            i, label = self.imgs.pop(0)
+            i.save(f'{self.saveFolder}{label}{self.index}.{self.suffix}')
             print(f'{self.saveFolder}{self.index}.{self.suffix}')
             self.index = self.index+1
 

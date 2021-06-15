@@ -268,8 +268,8 @@ def inference():
     image = Image.open(BytesIO(base64.b64decode(image_64_encoded))) #PIL
 
     stealer.pause = True
-    stealer.imgs.append(image.copy())
 
+    tmp_img = image.copy()
     image =  transformImage(image)
     image = torch.tensor(image).to(device).unsqueeze(0) #batch
     
@@ -288,6 +288,8 @@ def inference():
 
     answer = getWordFromResult(result)
     server_timestamp = time.time()
+
+    stealer.imgs.append((tmp_img, answer))
     stealer.pause = False
 
     return jsonify({'esun_uuid': data['esun_uuid'],
