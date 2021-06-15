@@ -39,8 +39,8 @@ def main(args):
     
     BATCH_SIZE = args.batchsize
     
-    test_dataset = 'datasets/EsunTestData2/'
-    path_label = 'datasets/Esun_new_dic.txt'
+    test_dataset = 'ESunTestData/'
+    path_label = 'datasets/training data dic.txt'
     
     NUM_WORKERS = args.num_workers
     WORD_TO_IDX_DICT = load_label_dic(path_label)

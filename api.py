@@ -85,7 +85,7 @@ args = parser.parse_args()
 # file path
 image_path = './train_image'
 path = './data'
-label_path = 'training data dic.txt'
+label_path = 'datasets/training data dic.txt'
 
 # Hyper Parameters
 if args.method == "efficientnet":
@@ -267,14 +267,12 @@ def inference():
     image_64_encoded = data['image']
     image = Image.open(BytesIO(base64.b64decode(image_64_encoded))) #PIL
 
-    stealer.pause=True
+    stealer.pause = True
     stealer.imgs.append(image.copy())
 
     image =  transformImage(image)
     image = torch.tensor(image).to(device).unsqueeze(0) #batch
     
-    output = model(image)
-    result = output
     t = datetime.datetime.now()
     ts = str(int(t.utcnow().timestamp()))
     server_uuid = generate_server_uuid(CAPTAIN_EMAIL + ts)
@@ -282,15 +280,15 @@ def inference():
     try:
         result = model(image)
     except TypeError as type_error:
-        # You can write some log...
+        print('shit can not process this image!!!')
         raise type_error
     except Exception as e:
-        # You can write some log...
+        print('shit can not process this image!!!')
         raise e
 
     answer = getWordFromResult(result)
     server_timestamp = time.time()
-    stealer.pause=False
+    stealer.pause = False
 
     return jsonify({'esun_uuid': data['esun_uuid'],
                     'server_uuid': server_uuid,
