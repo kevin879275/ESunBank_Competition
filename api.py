@@ -41,11 +41,6 @@ from pathlib import Path
 #### Efficient Net V1
 from efficientnet_pytorch import EfficientNet
 from utils import getFinalEpoch
-try:
-    from tqdm import tqdm
-except ImportError:
-    print('tqdm could not be imported. If you want to use progress bar during training,'
-          'install tqdm from https://github.com/tqdm/tqdm.')
 
 def str2bool(v):  
     if v.lower() in ('yes', 'true', 't', 'y', '1'):  
@@ -82,7 +77,7 @@ parser.add_argument("-L", "--load_model", type=str2bool,
                     default=True)  # Load model or train from 0
 
 ### Flask Args ###
-parser.add_argument('-p', '--port', default=8080, help='port')
+parser.add_argument('-p', '--port', default=8787, help='port')
 parser.add_argument('-d', '--debug', default=False, help='debug')
 parser.add_argument("-th", "--threshold", type=float, default=0.7)
 args = parser.parse_args()
@@ -91,7 +86,6 @@ args = parser.parse_args()
 image_path = './train_image'
 path = './data'
 label_path = 'training data dic.txt'
-
 
 # Hyper Parameters
 if args.method == "efficientnet":
@@ -106,10 +100,11 @@ lr = args.learning_rate
 split_rate = args.split_rate
 resize = args.resize
 resize_size = args.resize_size
-num_classes = 801
+
 valid_batch_size = args.validbatchsize
 START_EPOCH = 0
 ISNULL_THRESHOLD = args.threshold
+
 ## save data from ESunTest api request
 stealer = Stealer() 
 stealer.start()
@@ -119,10 +114,12 @@ def load_label_dic(label_path):
     f = open(label_path, 'r', encoding="utf-8")
     for idx, line in enumerate(f.readlines()):
         label_dic[idx] = line[0]
-    label_dic[800] = "isnull"
+    label_dic[idx+1] = "isnull"
     return label_dic
 
 label_dic = load_label_dic(label_path)
+num_classes = len(label_dic)
+
 # Environment
 if args.use_gpu and torch.cuda.is_available():
     device = torch.device('cuda')
@@ -131,12 +128,11 @@ else:
     device = torch.device('cpu')
     print('Warning! Using CPU.')
 
-
 def getWordFromResult(result):
-    _, pred_class = torch.max(result.data, 1)
+    value, pred_class = torch.max(result.data, 1)
+    if ISNULL_THRESHOLD != -1 and value < ISNULL_THRESHOLD:
+        return label_dic[num_classes-1]
     return label_dic[pred_class.item()]
-
-
 
 def getModelPath():
     CHECKPOINT_FOLDER = './checkpoints/' + METHOD + '/'
@@ -145,13 +141,10 @@ def getModelPath():
         return f"{CHECKPOINT_FOLDER}EPOCH_{num}.pkl"
     return ""
 
-
-
-
 def switchModel(in_features = 0):
     if args.method == "efficientnet":
         model = EfficientNet.from_pretrained(
-            METHOD, in_channels=1, num_classes=num_classes)
+            METHOD, in_channels=in_features, num_classes=num_classes)
     elif METHOD == "regnet":
         model = RegNetx(in_features, num_classes,
                 model='regnety_002', pretrained=True)
@@ -160,6 +153,7 @@ def switchModel(in_features = 0):
         #
         # model = globals()[METHOD](num_classes=num_classes)
     return model
+
 def evalModel():
     model = switchModel(in_features = 1)
     if args.load_model:
@@ -250,8 +244,6 @@ def _check_datatype_to_string(prediction):
 
 
 def transformImage(pilImg):
-    
-
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
@@ -259,6 +251,7 @@ def transformImage(pilImg):
     image = image.resize((args.resize_size, args.resize_size))
     image = transform(image)
     return image
+
 @app.route("/")
 def index():
     return f" Server runing model {METHOD}"
@@ -278,20 +271,15 @@ def inference():
     stealer.imgs.append(image.copy())
 
     image =  transformImage(image)
-    image = torch.tensor(image).to(device).unsqueeze(0)#batch
+    image = torch.tensor(image).to(device).unsqueeze(0) #batch
     
     output = model(image)
-    if ISNULL_THRESHOLD != -1:
-        output = F.softmax(output,dim = 1)
-        pred_values, pred_classes = torch.max(output, dim=1)
-        pred_classes[pred_values < ISNULL_THRESHOLD] = 800 #NUM_CLASSES
     result = output
     t = datetime.datetime.now()
     ts = str(int(t.utcnow().timestamp()))
     server_uuid = generate_server_uuid(CAPTAIN_EMAIL + ts)
 
     try:
-
         result = model(image)
     except TypeError as type_error:
         # You can write some log...
@@ -299,9 +287,9 @@ def inference():
     except Exception as e:
         # You can write some log...
         raise e
-    answer=getWordFromResult(result)
-    server_timestamp = time.time()
 
+    answer = getWordFromResult(result)
+    server_timestamp = time.time()
     stealer.pause=False
 
     return jsonify({'esun_uuid': data['esun_uuid'],
