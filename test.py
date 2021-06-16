@@ -17,6 +17,10 @@ from utils import *
 from DataLoader import ChineseHandWriteDataset, CleanDataset, NameDataset, CommonWordDataset
 
 
+test_dataset = 'datasets/ESunTestData/'
+path_label = 'datasets/training_data_dic.txt'
+
+
 def main(args):
     # ========================================================================================
     #   Variables
@@ -35,18 +39,18 @@ def main(args):
         device = torch.device('cpu')
         print('Warning! Using CPU.')
 
-    CHECKPOINT_FOLDER = args.checkpoint_root + METHOD + '/'
-    
-    BATCH_SIZE = args.batchsize
-    
-    test_dataset = 'ESunTestData2/'
-    path_label = 'training_data_dic.txt'
-    
     USE_PADDING = args.use_padding
     PADDING_FN = padding if USE_PADDING else None
     RESIZE_SIZE = args.resize_size
     RESIZE = False if RESIZE_SIZE == 0 or USE_PADDING else True
 
+    CHECKPOINT_FOLDER = args.checkpoint_root + METHOD
+    if USE_PADDING: CHECKPOINT_FOLDER = CHECKPOINT_FOLDER + '-padding'
+    else: CHECKPOINT_FOLDER = CHECKPOINT_FOLDER + '-resize'
+    CHECKPOINT_FOLDER = CHECKPOINT_FOLDER + '/'
+    print(f"Checkpoint folder: {CHECKPOINT_FOLDER}")
+
+    BATCH_SIZE = args.batchsize
     NUM_WORKERS = args.num_workers
     WORD_TO_IDX_DICT = load_label_dic(path_label)
     IDX_TO_WORD_DICT = load_word_dic(path_label)
@@ -73,7 +77,8 @@ def main(args):
     print(f"model is {METHOD}")
     model = switchModel(in_features=dataset[0][0].shape[0], num_classes=NUM_CLASSES, args=args, METHOD=METHOD)
     if args.load_model:
-        modelPath = getModelPath(CHECKPOINT_FOLDER=CHECKPOINT_FOLDER, args=args)
+        modelPath = getModelPath(CHECKPOINT_FOLDER=CHECKPOINT_FOLDER, args=args, EPOCH=0)
+        print(modelPath)
         if modelPath != "":
             model.load_state_dict(torch.load(modelPath))
     model.to(device)
@@ -96,7 +101,6 @@ def main(args):
                 pred_classes[pred_values < ISNULL_THRESHOLD] = NUM_CLASSES - 1
             sum_test_correct += torch.sum(pred_classes == batch_label)
 
-            print()
             for i in range(len(batch_img)):
                 if pred_classes[i] != batch_label[i]:
                     k = 5 

@@ -16,6 +16,15 @@ from model import *
 from utils import *
 from DataLoader import ChineseHandWriteDataset, CleanDataset, NameDataset, CommonWordDataset
 
+
+path_gray_image = 'datasets/gray_dataset/'
+path_synthesis = 'datasets/synthesis/'
+path_name = 'datasets/name/' 
+path_common_word = 'datasets/common_word/'
+path_label = 'datasets/training_data_dic.txt'
+path_days = 'datasets/modelLabelDays/'
+
+
 def main(args):
     # ========================================================================================
     #   Variables
@@ -34,24 +43,22 @@ def main(args):
         device = torch.device('cpu')
         print('Warning! Using CPU.')
 
-    CHECKPOINT_FOLDER = args.checkpoint_root + METHOD + '/'
-    
-    EPOCH = args.epochs
-    LAST_EPOCH = getFinalEpoch(args=args, CHECKPOINT_FOLDER=CHECKPOINT_FOLDER)
-    START_EPOCH = LAST_EPOCH + 1 if LAST_EPOCH is not None else 0
-    BATCH_SIZE = args.batchsize
-    
-    path_gray_image = 'gray_dataset/'
-    path_synthesis = 'synthesis/'
-    path_name = 'datasets/name/' 
-    path_common_word = 'datasets/common_word/'
-    path_label = 'training_data_dic.txt'
-    
     USE_PADDING = args.use_padding
     PADDING_FN = padding if USE_PADDING else None
     RESIZE_SIZE = args.resize_size
     RESIZE = False if RESIZE_SIZE == 0 or USE_PADDING else True
 
+    CHECKPOINT_FOLDER = args.checkpoint_root + METHOD
+    if USE_PADDING: CHECKPOINT_FOLDER = CHECKPOINT_FOLDER + '-padding'
+    CHECKPOINT_FOLDER = CHECKPOINT_FOLDER + '/'
+    Path(CHECKPOINT_FOLDER).mkdir(exist_ok=True, parents=True)
+    print(f"Initialize the data folder: {CHECKPOINT_FOLDER}")
+
+    EPOCH = args.epochs
+    LAST_EPOCH = getFinalEpoch(args=args, CHECKPOINT_FOLDER=CHECKPOINT_FOLDER)
+    START_EPOCH = LAST_EPOCH + 1 if LAST_EPOCH is not None else 0
+    BATCH_SIZE = args.batchsize
+        
     NUM_WORKERS = args.num_workers
     SEED = args.seed
     WORD_TO_IDX_DICT = load_label_dic(path_label)
@@ -59,9 +66,6 @@ def main(args):
     TRNASFORM = transforms.Compose([transforms.ToTensor()])
     USE_RANDAUG = (args.method=="efficientnetV2")
 
-    print("init data folder")
-    Path(CHECKPOINT_FOLDER).mkdir(exist_ok=True, parents=True)
-    
     LR = args.learning_rate
     ENDING_LR = args.ending_learning_rate
     SPLIT_RATE = args.split_rate
@@ -73,27 +77,32 @@ def main(args):
     # ========================================================================================
     #   Data Loader
     # ========================================================================================
-    dataset_path_list = [path_gray_image, path_synthesis]
+    dataset_path_list = [path_days, path_gray_image]
     loader_list = []
 
     for img_path in dataset_path_list:
         train_dataset, valid_dataset = [], []
         for _, dir_ in enumerate(os.listdir(img_path)):
+            root_path = os.path.join(img_path, dir_)
             if img_path == path_gray_image:
                 dataset = ChineseHandWriteDataset(
-                    root=img_path + dir_, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
+                    root=root_path, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
                     resize_size=RESIZE_SIZE, randaug=USE_RANDAUG)
             elif img_path == path_synthesis:
                 dataset = CleanDataset(
-                    root=img_path + dir_, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
-                    resize_size=RESIZE_SIZE, randaug=USE_RANDAUG)
+                    root=root_path, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
+                    resize_size=RESIZE_SIZE, randaug=USE_RANDG)
             elif img_path == path_name:
                 dataset = NameDataset(
-                    root=img_path + dir_, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
+                    root=root_path, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
                     resize_size=RESIZE_SIZE, randaug=USE_RANDAUG)
             elif img_path == path_common_word:
                 dataset = CommonWordDataset(
-                    root=img_path + dir_, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
+                    root=root_path, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
+                    resize_size=RESIZE_SIZE, randaug=USE_RANDAUG)
+            elif img_path == path_days:
+                dataset = CommonWordDataset(
+                    root=root_path, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
                     resize_size=RESIZE_SIZE, randaug=USE_RANDAUG)
             else:
                 raise NotImplementedError('Dataset Is Not Found.')
@@ -149,7 +158,7 @@ def main(args):
             model.train()
             train_bar = tqdm(train_dataloader)
             
-            for batch_img, batch_label, _, _ in train_bar:
+            for batch_img, batch_label, folder, filename in train_bar:
                 batch_img, batch_label = batch_img.to(device), batch_label.to(device)
                 output = model(batch_img)
 
@@ -212,8 +221,8 @@ def main(args):
             print("Training time is:{:.0f}m {:.0f}s".format(now_time // 60, now_time % 60))
 
             # Save Files
-            path_model_save = os.path.join('checkpoints', METHOD, 'EPOCH_' + str(epoch) + '.pkl')
-            path_out_file = os.path.join('checkpoints', METHOD, 'result_param.json')
+            path_model_save = os.path.join(CHECKPOINT_FOLDER, 'EPOCH_' + str(epoch) + '.pkl')
+            path_out_file = os.path.join(CHECKPOINT_FOLDER, 'result_param.json')
             torch.save(model.state_dict(), path_model_save)
             with open(path_out_file, "w+") as out_file:
                 json.dump(result_param, out_file, indent=4)
@@ -221,7 +230,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ESun Competition HandWrite Recognition")
     
-    parser.add_argument("-e", "--epochs", type=int, default=100)
+    parser.add_argument("-e", "--epochs", type=int, default=1000)
     parser.add_argument("-b", "--batchsize", type=int, default=16)
     parser.add_argument("-lr", "--learning_rate", type=float, default=0.001)
     parser.add_argument("-ending-lr", "--ending_learning_rate", type=float, default=0.00001)
