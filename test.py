@@ -14,10 +14,10 @@ from torch_poly_lr_decay import PolynomialLRDecay
 
 from model import *
 from utils import *
-from DataLoader import ChineseHandWriteDataset, CleanDataset, NameDataset, CommonWordDataset
+from DataLoader import ChineseHandWriteDataset, CleanDataset, NameDataset, CommonWordDataset, CompDataset
 
 
-test_dataset = 'datasets/ESunTestData/'
+test_dataset = 'datasets/CompData/Day1'
 path_label = 'datasets/training_data_dic.txt'
 
 
@@ -45,8 +45,8 @@ def main(args):
     RESIZE = False if RESIZE_SIZE == 0 or USE_PADDING else True
 
     CHECKPOINT_FOLDER = args.checkpoint_root + METHOD
-    if USE_PADDING: CHECKPOINT_FOLDER = CHECKPOINT_FOLDER + '-padding'
-    else: CHECKPOINT_FOLDER = CHECKPOINT_FOLDER + '-resize'
+    # if USE_PADDING: CHECKPOINT_FOLDER = CHECKPOINT_FOLDER + '-padding'
+    # else: CHECKPOINT_FOLDER = CHECKPOINT_FOLDER + '-resize'
     CHECKPOINT_FOLDER = CHECKPOINT_FOLDER + '/'
     print(f"Checkpoint folder: {CHECKPOINT_FOLDER}")
 
@@ -65,7 +65,7 @@ def main(args):
     # ========================================================================================
     #   Data Loader
     # ========================================================================================
-    dataset = ChineseHandWriteDataset(
+    dataset = CompDataset(
         root=test_dataset, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
         resize_size=RESIZE_SIZE, randaug=USE_RANDAUG)
     dataloader = DataLoader(
@@ -74,13 +74,15 @@ def main(args):
     # ========================================================================================
     #   Testing
     # ========================================================================================
-    print(f"model is {METHOD}")
+    print(f"ModelType: {METHOD}")
     model = switchModel(in_features=dataset[0][0].shape[0], num_classes=NUM_CLASSES, args=args, METHOD=METHOD)
     if args.load_model:
-        modelPath = getModelPath(CHECKPOINT_FOLDER=CHECKPOINT_FOLDER, args=args, EPOCH=0)
-        print(modelPath)
+        modelPath = getModelPath(CHECKPOINT_FOLDER=CHECKPOINT_FOLDER, args=args)
         if modelPath != "":
+            print(f"Load model: {modelPath}")
             model.load_state_dict(torch.load(modelPath))
+        else:
+            print(f"Load model: None")
     model.to(device)
 
 

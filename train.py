@@ -22,7 +22,8 @@ path_synthesis = 'datasets/synthesis/'
 path_name = 'datasets/name/' 
 path_common_word = 'datasets/common_word/'
 path_label = 'datasets/training_data_dic.txt'
-path_days = 'datasets/modelLabelDays/'
+path_day1 = 'datasets/CompDataDay1'
+path_day2 = 'datasets/CompDataDay2'
 
 
 def main(args):
@@ -77,7 +78,7 @@ def main(args):
     # ========================================================================================
     #   Data Loader
     # ========================================================================================
-    dataset_path_list = [path_days, path_gray_image]
+    dataset_path_list = [path_day1, path_day2, path_gray_image]
     loader_list = []
 
     for img_path in dataset_path_list:
@@ -91,7 +92,7 @@ def main(args):
             elif img_path == path_synthesis:
                 dataset = CleanDataset(
                     root=root_path, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
-                    resize_size=RESIZE_SIZE, randaug=USE_RANDG)
+                    resize_size=RESIZE_SIZE, randaug=USE_RANDAUG)
             elif img_path == path_name:
                 dataset = NameDataset(
                     root=root_path, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
@@ -100,7 +101,7 @@ def main(args):
                 dataset = CommonWordDataset(
                     root=root_path, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
                     resize_size=RESIZE_SIZE, randaug=USE_RANDAUG)
-            elif img_path == path_days:
+            elif img_path == path_day1 or img_path == path_day2:
                 dataset = CommonWordDataset(
                     root=root_path, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
                     resize_size=RESIZE_SIZE, randaug=USE_RANDAUG)
@@ -129,13 +130,15 @@ def main(args):
     # ========================================================================================
     #   Training
     # ========================================================================================
-    print(f"model is {METHOD}")
-    
+    print(f"ModelType: {METHOD}")
     model = switchModel(in_features=dataset[0][0].shape[0], num_classes=NUM_CLASSES, args=args, METHOD=METHOD)
     if args.load_model:
         modelPath = getModelPath(CHECKPOINT_FOLDER=CHECKPOINT_FOLDER, args=args)
         if modelPath != "":
+            print(f"Load model: {modelPath}")
             model.load_state_dict(torch.load(modelPath))
+        else:
+            print(f"Load model: None")
     model.to(device)
     
     loss_weights = None

@@ -154,3 +154,4 @@ legacy/
 *.sh
 第二次清洗完成資料集/
 is_null/
+result/

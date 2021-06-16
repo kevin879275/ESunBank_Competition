@@ -99,3 +99,8 @@ class CommonWordDataset(ChineseHandWriteDataset):
     
     def getLabelFromPath(self,path):
         return path.split('/')[-1][0]
+
+class CompDataset(ChineseHandWriteDataset):
+    
+    def getLabelFromPath(self,path):
+        return path.split('/')[-1][0]
