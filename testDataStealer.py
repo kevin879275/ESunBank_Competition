@@ -18,8 +18,9 @@ class Stealer:
             p.mkdir(parents=True,exist_ok=True)
             return 0
         files = [int(re.match(f'(\d+)\.{self.suffix}', x).group(1)) for x in filter(lambda x:re.match(f'\d+\.{self.suffix}', x), os.listdir(self.saveFolder))]
+
+        return 0 if not len(files) else max(files)+1
         
-        return max(files)+1
     def stop(self):
         self.enable=False
     def start(self):

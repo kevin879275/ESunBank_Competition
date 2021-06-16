@@ -130,8 +130,10 @@ else:
 
 def getWordFromResult(result):
     value, pred_class = torch.max(result.data, 1)
+
     if ISNULL_THRESHOLD != -1 and value < ISNULL_THRESHOLD:
         return label_dic[num_classes-1]
+    
     return label_dic[pred_class.item()]
 
 def getModelPath():
@@ -279,6 +281,7 @@ def inference():
 
     try:
         result = model(image)
+        result = F.softmax(result, dim=1)
     except TypeError as type_error:
         print('shit can not process this image!!!')
         raise type_error
