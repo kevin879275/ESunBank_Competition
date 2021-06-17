@@ -62,7 +62,7 @@ class ChineseHandWriteDataset(Dataset):
         if not self._eval and self.randaug:
             self.randaugment(img)
         
-        return self.transform(img), label, "/".join(img_path.split("/")[:-1]), img_path.split("/")[-1]
+        return self.transform(img), label, "/".join(img_path.split("/")[:-1]), img_path.split("/")[-1], img_path
     
     def getLabelFromPath(self,path):
         return path[-5:-4]

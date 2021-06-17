@@ -3,6 +3,7 @@ import json
 import os
 import time
 from pathlib import Path
+from PIL import Image
 from tqdm import tqdm
 
 import matplotlib.pyplot as plt
@@ -39,9 +40,10 @@ def main(args):
     
     BATCH_SIZE = args.batchsize
     
-    test_dataset = 'ESunTestData2/'
-    path_label = 'training_data_dic.txt'
-    
+    test_dataset = 'EsunTestData/'
+    # path_label = 'datasets/Esun_new_dic1_3.txt.'
+    path_label = 'datasets/training data dic.txt'
+
     USE_PADDING = args.use_padding
     PADDING_FN = padding if USE_PADDING else None
     RESIZE_SIZE = args.resize_size
@@ -61,7 +63,7 @@ def main(args):
     # ========================================================================================
     #   Data Loader
     # ========================================================================================
-    dataset = ChineseHandWriteDataset(
+    dataset = NameDataset(
         root=test_dataset, label_dic=WORD_TO_IDX_DICT, transform=TRNASFORM, resize=RESIZE,
         resize_size=RESIZE_SIZE, randaug=USE_RANDAUG)
     dataloader = DataLoader(
@@ -85,7 +87,7 @@ def main(args):
         val_bar = tqdm(dataloader)
         
         sum_test_correct = 0
-        for batch_img, batch_label, folder, filename in val_bar:
+        for batch_img, batch_label, folder, filename, img_path in val_bar:
             batch_img, batch_label = batch_img.to(device), batch_label.to(device)
             
             output = model(batch_img)
@@ -94,32 +96,55 @@ def main(args):
             pred_values, pred_classes = torch.max(output, 1)
             if ISNULL_THRESHOLD != -1:
                 pred_classes[pred_values < ISNULL_THRESHOLD] = NUM_CLASSES - 1
+            # batch_label[batch_label > 800] = NUM_CLASSES - 1
+            # pred_classes[pred_classes > 800] = NUM_CLASSES - 1
+
             sum_test_correct += torch.sum(pred_classes == batch_label)
 
-            print()
+            # print()
             for i in range(len(batch_img)):
-                if pred_classes[i] != batch_label[i]:
-                    k = 5 
-                    pred_classes_topk_values, pred_classes_topk_indices = \
-                        torch.topk(output.data, k, dim=1)
-                    
-                    fromp = f"{folder[i]}{filename[i]}"
-                    
-                    topk_probs = []
-                    for j in range(k):
-                        pred_idx = pred_classes_topk_indices[i][j].item()
-                        pred_word = IDX_TO_WORD_DICT[pred_idx]
-                        value = pred_classes_topk_values[i][j].item()
-                        word_prob = f"{pred_word}-{round(value,3)}"
-                        topk_probs.append(word_prob)
-                    topk_probs = ",".join(topk_probs) + ".png"
-                    print(topk_probs)
+                # if pred_classes[i] != batch_label[i]:
+                k = 1 
+                pred_classes_topk_values, pred_classes_topk_indices = \
+                    torch.topk(output.data, k, dim=1)
+                
+                fromp = f"{folder[i]}{filename[i]}"
+                
+                topk_probs = []
+                probs = []
+                for j in range(k):
+                    pred_idx = pred_classes_topk_indices[i][j].item()
+                    pred_word = IDX_TO_WORD_DICT[pred_idx]
+                    value = pred_classes_topk_values[i][j].item()
+                    word_prob = f"{pred_word}_{filename[i].split('.')[0].split('_')[1]}"
+                    topk_probs.append(word_prob)
+                    probs.append(round(value,3))
+                topk_probs = ",".join(topk_probs) + ".png"
+                # print(topk_probs)
 
-                    show_use_padding = lambda: "padding" if USE_PADDING else "resize"
-                    wront_output_folder = f'result/{show_use_padding()}-{ISNULL_THRESHOLD}'
-                    wront_output_path = os.path.join(wront_output_folder, topk_probs)
-                    os.makedirs(wront_output_folder, exist_ok=True)
-                    torchvision.utils.save_image(batch_img[i], wront_output_path)
+                show_use_padding = lambda: "padding" if USE_PADDING else "resize"
+
+                seg = 0
+                if probs[0] < 0.2:
+                    seg = '0-0.2'
+                elif probs[0] < 0.5:
+                    seg = '0.2-0.5'
+                elif probs[0] < 0.75:
+                    seg = '0.5-0.75'
+                elif probs[0] < 0.9:
+                    seg = '0.75-0.9'
+                elif probs[0] < 0.95:
+                    seg = '0.9-0.95'
+                elif probs[0] < 0.99:
+                    seg = '0.95-0.99'
+                else:
+                    seg = '0.99up'
+                
+                wront_output_folder = f'result/{show_use_padding()}-{ISNULL_THRESHOLD}-{seg}'
+                wront_output_path = os.path.join(wront_output_folder, topk_probs)
+                os.makedirs(wront_output_folder, exist_ok=True)
+                ord_img = Image.open(img_path[i])
+                ord_img.save(wront_output_path)
 
             val_bar.set_description()
 
@@ -130,7 +155,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ESun Competition HandWrite Recognition")
     
     parser.add_argument("-e", "--epochs", type=int, default=100)
-    parser.add_argument("-b", "--batchsize", type=int, default=512)
+    parser.add_argument("-b", "--batchsize", type=int, default=32)
     parser.add_argument("-l", "--learning_rate", type=float, default=0.001)
     parser.add_argument("-el", "--ending_learning_rate", type=float, default=0.00001)
     parser.add_argument("-s", "--split_rate", type=float, default=0.8)
@@ -143,12 +168,12 @@ if __name__ == "__main__":
 
     ### Checkpoint Path / Select Method ###
     ### final save name => method + method_level, e.g. efficientNet-b0
-    parser.add_argument("-m", "--method", type=str, default="efficientnetV2") # Method save name and load name
-    parser.add_argument("-ml", "--method_level", type=str, default="m") # Method level e.g. b0, b1, b2, b3 or S, M, L
+    parser.add_argument("-m", "--method", type=str, default="efficientnet") # Method save name and load name
+    parser.add_argument("-ml", "--method_level", type=str, default="b7") # Method level e.g. b0, b1, b2, b3 or S, M, L
     
     ### Load Model Settings ###
     ### Load from epoch, -1 = final epoch in checkpoint
-    parser.add_argument("-se", "--start_epoch", type=int, default=-1)
+    parser.add_argument("-se", "--start_epoch", type=int, default = -1)
     parser.add_argument("-L", "--load_model", type=str2bool, default=True)  # Load model or train from 0
     parser.add_argument("-cr","--checkpoint_root", type=str, default="./checkpoints/")
     parser.add_argument("-data","--dataset", type=str, default="")
