@@ -17,7 +17,7 @@ from utils import *
 from DataLoader import ChineseHandWriteDataset, CleanDataset, NameDataset, CommonWordDataset, CompDataset
 
 
-test_dataset = 'datasets/CompData/Day1'
+test_dataset = 'datasets/CompDataDay1/Day1'
 path_label = 'datasets/training_data_dic.txt'
 
 
@@ -118,7 +118,7 @@ def main(args):
                         value = pred_classes_topk_values[i][j].item()
                         word_prob = f"{pred_word}-{round(value,3)}"
                         topk_probs.append(word_prob)
-                    topk_probs = ",".join(topk_probs) + ".png"
+                    topk_probs =  f"{IDX_TO_WORD_DICT[batch_label[i].item()]}_"+ ",".join(topk_probs) + ".png"
                     print(topk_probs)
 
                     show_use_padding = lambda: "padding" if USE_PADDING else "resize"

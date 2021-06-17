@@ -74,11 +74,12 @@ def main(args):
     FL_USE_WEIGHT = False
 
     ISNULL_THRESHOLD = args.threshold
+    EVAL_ONLY = True
 
     # ========================================================================================
     #   Data Loader
     # ========================================================================================
-    dataset_path_list = [path_day1, path_day2, path_gray_image]
+    dataset_path_list = [path_day2]
     loader_list = []
 
     for img_path in dataset_path_list:
@@ -152,16 +153,16 @@ def main(args):
     result_param = {'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': []}
     
     for epoch in range(START_EPOCH, EPOCH):
+        since = time.time()
+        sum_train_loss, sum_train_correct, sum_val_loss, sum_val_correct = 0, 0, 0, 0
         scheduler_poly_lr_decay.step(epoch)
         
         for train_dataloader, valid_dataloader in loader_list:
-            since = time.time()
-            sum_train_loss, sum_train_correct, sum_val_loss, sum_val_correct = 0, 0, 0, 0
-
             model.train()
             train_bar = tqdm(train_dataloader)
             
             for batch_img, batch_label, folder, filename in train_bar:
+                if EVAL_ONLY: break # TODO: removed
                 batch_img, batch_label = batch_img.to(device), batch_label.to(device)
                 output = model(batch_img)
 
@@ -204,12 +205,19 @@ def main(args):
             
             num_batches = len(train_dataloader.dataset) // BATCH_SIZE
 
-            result_param['train_loss'].append(
-                sum_train_loss.item() / num_batches)
-            result_param['train_acc'].append(
-                sum_train_correct.item() / len(train_dataloader.dataset))
+            if not EVAL_ONLY:
+                result_param['train_loss'].append(
+                    sum_train_loss.item() / num_batches)
+            else:
+                result_param['train_loss'].append(0)
+            if not EVAL_ONLY:
+                result_param['train_acc'].append(
+                    sum_train_correct.item() / len(train_dataloader.dataset))
+            else:
+                result_param['train_acc'].append(0)
+
             result_param['val_loss'].append(
-                sum_val_loss.item() / num_batches)
+                    sum_val_loss.item() / num_batches)
             result_param['val_acc'].append(
                 sum_val_correct.item() / len(valid_dataloader.dataset))
 
@@ -223,12 +231,15 @@ def main(args):
             now_time = time.time() - since
             print("Training time is:{:.0f}m {:.0f}s".format(now_time // 60, now_time % 60))
 
-            # Save Files
-            path_model_save = os.path.join(CHECKPOINT_FOLDER, 'EPOCH_' + str(epoch) + '.pkl')
-            path_out_file = os.path.join(CHECKPOINT_FOLDER, 'result_param.json')
-            torch.save(model.state_dict(), path_model_save)
-            with open(path_out_file, "w+") as out_file:
-                json.dump(result_param, out_file, indent=4)
+            if EVAL_ONLY:
+                exit(0)
+
+            # # Save Files
+            # path_model_save = os.path.join(CHECKPOINT_FOLDER, 'EPOCH_' + str(epoch) + '.pkl')
+            # path_out_file = os.path.join(CHECKPOINT_FOLDER, 'result_param.json')
+            # torch.save(model.state_dict(), path_model_save)
+            # with open(path_out_file, "w+") as out_file:
+            #     json.dump(result_param, out_file, indent=4)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ESun Competition HandWrite Recognition")
